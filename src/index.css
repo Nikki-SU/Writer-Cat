@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义基础样式 */
+:root {
+  --color-primary: #4DBBD5;
+  --color-success: #00A087;
+  --color-info: #3C5488;
+  --color-secondary: #8491B4;
+  --color-danger: #E64B35;
+  --color-warning: #F39B7F;
+  
+  --font-ui: 'Noto Sans SC', sans-serif;
+  --font-writing: 'LXGW WenKai', serif;
+  
+  --sidebar-width: 280px;
+  --toolbar-height: 48px;
+  --statusbar-height: 36px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 暗色模式滚动条 */
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 情绪颜色 */
+.emotion-deep-blue { background-color: #1e3a5f; }
+.emotion-light-blue { background-color: #93c5fd; }
+.emotion-white { background-color: #f8fafc; }
+.emotion-light-red { background-color: #fca5a5; }
+.emotion-deep-red { background-color: #dc2626; }
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-slideOutRight {
+  animation: slideOutRight 0.3s ease-out;
+}
+
+/* 错别字高亮 */
+.spelling-error {
+  color: #dc2626;
+  text-decoration: underline wavy #dc2626;
+  text-underline-offset: 2px;
+}
+
+/* 卡片翻转 */
+.card-flip-container {
+  perspective: 1000px;
+}
+
+.card-flip {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.card-flip.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-front, .card-back {
+  backface-visibility: hidden;
+}
+
+.card-back {
+  transform: rotateY(180deg);
+}
+
+/* 写作字体 */
+.font-writing {
+  font-family: var(--font-writing);
+}
