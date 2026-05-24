@@ -27,6 +27,13 @@ export const useEditorStore = create((set, get) => ({
   isAiProcessing: false,
   aiProcessingType: null,
   
+  // 选中文字高亮标记
+  highlightedRanges: {
+    spelling: [],  // [{ start, end, suggestion }]
+    worldview: [], // [{ start, end, conflict }]
+    character: [], // [{ start, end, conflict }]
+  },
+  
   // 设置内容
   setContent: (content) => {
     const { originalContent } = get();
@@ -70,6 +77,14 @@ export const useEditorStore = create((set, get) => ({
     set({
       spellingErrors: errors,
       currentErrorIndex: errors.length > 0 ? 0 : -1,
+      highlightedRanges: {
+        ...get().highlightedRanges,
+        spelling: errors.map((e) => ({
+          start: e.start,
+          end: e.end,
+          suggestion: e.suggestion,
+        })),
+      },
     });
   },
   
@@ -77,11 +92,32 @@ export const useEditorStore = create((set, get) => ({
   acceptError: (index) => {
     const { spellingErrors } = get();
     if (index >= 0 && index < spellingErrors.length) {
-      // TODO: 实现替换逻辑
+      const error = spellingErrors[index];
+      // 应用修改
+      const { content } = get();
+      const newContent = 
+        content.substring(0, error.start) + 
+        error.suggestion + 
+        content.substring(error.end);
+      set({
+        content: newContent,
+        originalContent: newContent,
+        isDirty: false,
+        lastSaved: new Date(),
+      });
+      // 移除已处理的错误
       const newErrors = spellingErrors.filter((_, i) => i !== index);
       set({
         spellingErrors: newErrors,
         currentErrorIndex: Math.min(index, newErrors.length - 1),
+        highlightedRanges: {
+          ...get().highlightedRanges,
+          spelling: newErrors.map((e) => ({
+            start: e.start,
+            end: e.end,
+            suggestion: e.suggestion,
+          })),
+        },
       });
     }
   },
@@ -94,8 +130,65 @@ export const useEditorStore = create((set, get) => ({
       set({
         spellingErrors: newErrors,
         currentErrorIndex: Math.min(index, newErrors.length - 1),
+        highlightedRanges: {
+          ...get().highlightedRanges,
+          spelling: newErrors.map((e) => ({
+            start: e.start,
+            end: e.end,
+            suggestion: e.suggestion,
+          })),
+        },
       });
     }
+  },
+  
+  // 设置世界观冲突高亮
+  setWorldviewConflicts: (conflicts) => {
+    set({
+      highlightedRanges: {
+        ...get().highlightedRanges,
+        worldview: conflicts.map((c) => ({
+          start: c.start,
+          end: c.end,
+          conflict: c,
+        })),
+      },
+    });
+  },
+  
+  // 设置人设冲突高亮
+  setCharacterConflicts: (conflicts) => {
+    set({
+      highlightedRanges: {
+        ...get().highlightedRanges,
+        character: conflicts.map((c) => ({
+          start: c.start,
+          end: c.end,
+          conflict: c,
+        })),
+      },
+    });
+  },
+  
+  // 清除特定类型的高亮
+  clearHighlight: (type) => {
+    set({
+      highlightedRanges: {
+        ...get().highlightedRanges,
+        [type]: [],
+      },
+    });
+  },
+  
+  // 清除所有高亮
+  clearAllHighlights: () => {
+    set({
+      highlightedRanges: {
+        spelling: [],
+        worldview: [],
+        character: [],
+      },
+    });
   },
   
   // 切换错别字面板
@@ -118,6 +211,11 @@ export const useEditorStore = create((set, get) => ({
       showSpellingPanel: false,
       isAiProcessing: false,
       aiProcessingType: null,
+      highlightedRanges: {
+        spelling: [],
+        worldview: [],
+        character: [],
+      },
     });
   },
 }));

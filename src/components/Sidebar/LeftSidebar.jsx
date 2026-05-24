@@ -1,22 +1,37 @@
 // 左边栏主组件
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBookStore } from '../../stores/useBookStore';
+import { useStructureStore } from '../../stores/useStructureStore';
 import BookList from './BookList';
 import ChapterList from './ChapterList';
 import PlotCard from './PlotCard';
 import ForeshadowList from './ForeshadowList';
+import ThreadList from './ThreadList';
 import CharacterPanel from './CharacterPanel';
 import WorldviewPanel from './WorldviewPanel';
 
 function LeftSidebar({ onClose, editorRef }) {
+  const { currentBook } = useBookStore();
+  const { loadForeshadows, loadWorldviews, loadThreads } = useStructureStore();
+  
   const [expandedSections, setExpandedSections] = useState({
     book: true,
     chapter: true,
     plot: true,
     foreshadow: true,
+    thread: true,
     character: true,
     worldview: false,
   });
+
+  // 加载结构数据
+  useEffect(() => {
+    if (currentBook) {
+      loadForeshadows(currentBook.id);
+      loadWorldviews(currentBook.id);
+      loadThreads(currentBook.id);
+    }
+  }, [currentBook, loadForeshadows, loadWorldviews, loadThreads]);
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({
@@ -55,9 +70,14 @@ function LeftSidebar({ onClose, editorRef }) {
           <PlotCard />
         </section>
 
-        {/* 伏笔（不可折叠） */}
+        {/* 伏笔（不可折叠，只显示未完成） */}
         <section className="border-b dark:border-gray-700">
           <ForeshadowList />
+        </section>
+
+        {/* 线索/长伏笔（不可折叠，只显示未完成） */}
+        <section className="border-b dark:border-gray-700">
+          <ThreadList />
         </section>
 
         {/* 人物（可折叠，可检索） */}
@@ -80,7 +100,7 @@ function LeftSidebar({ onClose, editorRef }) {
           )}
         </section>
 
-        {/* 世界观（可折叠，可检索） */}
+        {/* 世界观（可折叠，可检索，有条目+挂载按钮） */}
         <section>
           <div
             className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"

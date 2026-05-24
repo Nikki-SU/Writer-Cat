@@ -46,3 +46,23 @@ export async function generateTimeline(characterName, bookId, allChapters = true
     currentChapterId,
   });
 }
+
+/**
+ * 检查世界观冲突
+ * @param {string} text - 待检查文本
+ * @param {Worldview[]} worldviews - 世界观列表
+ * @returns {Promise<WorldviewConflict[]>}
+ */
+export async function checkWorldviewConflict(text, worldviews) {
+  return await invoke('check_worldview_conflict', { text, worldviews });
+}
+
+/**
+ * 检查人物人设冲突
+ * @param {string} text - 待检查文本
+ * @param {Character[]} characters - 人物列表
+ * @returns {Promise<CharacterConflict[]>}
+ */
+export async function checkCharacterConflict(text, characters) {
+  return await invoke('check_character_conflict', { text, characters });
+}

@@ -1,13 +1,15 @@
-// 情节页
-import { Link } from 'react-router-dom';
-import { useBookStore } from '../stores/useBookStore';
+// 情节页 - 网格卡片布局
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { EMOTION_COLORS } from '../utils/constants';
+import { useBookStore } from '../stores/useBookStore';
+import EmotionCircle from '../components/common/EmotionCircle';
 
 function Plot() {
+  const navigate = useNavigate();
   const { currentBook, chapters, loadBooks, selectBook } = useBookStore();
-  const [plots, setPlots] = useState({}); // { chapterId: [plotItem, ...] }
-  const [editingPlot, setEditingPlot] = useState(null);
+  const [plots, setPlots] = useState({}); // { chapterId: [plotItem] }
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [editingChapter, setEditingChapter] = useState(null);
   const [newPlotContent, setNewPlotContent] = useState('');
 
   useEffect(() => {
@@ -18,10 +20,9 @@ function Plot() {
   useEffect(() => {
     if (currentBook && chapters.length > 0) {
       // TODO: 从API加载情节数据
-      // 暂时使用空数据
       const plotsData = {};
       chapters.forEach((ch) => {
-        plotsData[ch.id] = [];
+        plotsData[ch.id] = ch.plots || [];
       });
       setPlots(plotsData);
     }
@@ -29,12 +30,18 @@ function Plot() {
 
   const handleAddPlot = async (chapterId) => {
     if (!newPlotContent.trim()) return;
-    // TODO: 调用API创建情节
     const newPlot = {
       id: Date.now().toString(),
       content: newPlotContent.trim(),
       completed: false,
       orderIndex: (plots[chapterId] || []).length,
+      emotionColors: {
+        wordCount: 'white',
+        expected: 'white',
+        actual: 'white',
+      },
+      wordCountActual: 0,
+      wordCountTarget: 3000,
     };
     setPlots((prev) => ({
       ...prev,
@@ -43,13 +50,32 @@ function Plot() {
     setNewPlotContent('');
   };
 
-  const handleToggleComplete = async (chapterId, plotId) => {
+  const handleToggleComplete = (chapterId, plotId) => {
     setPlots((prev) => ({
       ...prev,
       [chapterId]: (prev[chapterId] || []).map((p) =>
         p.id === plotId ? { ...p, completed: !p.completed } : p
       ),
     }));
+  };
+
+  const handleEmotionChange = (chapterId, plotId, type, colorId) => {
+    setPlots((prev) => ({
+      ...prev,
+      [chapterId]: (prev[chapterId] || []).map((p) =>
+        p.id === plotId
+          ? {
+              ...p,
+              emotionColors: { ...p.emotionColors, [type]: colorId },
+            }
+          : p
+      ),
+    }));
+  };
+
+  const handleChapterClick = (chapter) => {
+    selectBook(currentBook.id);
+    navigate('/writer', { state: { chapterId: chapter.id } });
   };
 
   if (!currentBook) {
@@ -76,10 +102,24 @@ function Plot() {
             </Link>
             <h1 className="text-xl font-bold text-gray-800 dark:text-white">情节</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <span className="text-gray-600 dark:text-gray-300">
-              当前: {currentBook.name}
+              {currentBook.name}
             </span>
+            <div className="flex border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1 text-sm ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+              >
+                网格
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-sm ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+              >
+                列表
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -91,96 +131,144 @@ function Plot() {
         </p>
       </div>
 
-      {/* 章节网格卡片 */}
+      {/* 章节网格/列表 */}
       <main className="max-w-7xl mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {chapters.map((chapter, index) => (
-            <div
-              key={chapter.id}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 min-h-[200px] flex flex-col"
-            >
-              {/* 章节标题和目标字数 */}
-              <div className="flex items-center justify-between mb-3 pb-3 border-b dark:border-gray-700">
-                <h3 className="font-semibold text-gray-800 dark:text-white">
-                  第{index + 1}章
-                </h3>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  目标: {chapter.target_word_count || 3000}
-                </span>
-              </div>
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {chapters.map((chapter, index) => {
+              const chapterPlots = plots[chapter.id] || [];
+              const completedCount = chapterPlots.filter((p) => p.completed).length;
+              const totalCount = chapterPlots.length;
 
-              {/* 情节列表 */}
-              <div className="flex-1 space-y-2 mb-3">
-                {(plots[chapter.id] || []).map((plot) => (
-                  <div
-                    key={plot.id}
-                    className={`flex items-center gap-2 text-sm ${
-                      plot.completed ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        plot.completed ? 'bg-green-500' : 'bg-gray-400'
-                      }`}
-                    />
-                    <span className="flex-1 truncate">{plot.content}</span>
-                  </div>
-                ))}
-                {(plots[chapter.id] || []).length === 0 && (
-                  <p className="text-sm text-gray-400 italic">暂无情节</p>
-                )}
-              </div>
-
-              {/* 添加情节 */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={editingPlot === chapter.id ? newPlotContent : ''}
-                  onChange={(e) => {
-                    setEditingPlot(chapter.id);
-                    setNewPlotContent(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddPlot(chapter.id);
-                      setEditingPlot(null);
-                    }
-                  }}
-                  placeholder="添加情节..."
-                  className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-                <button
-                  onClick={() => {
-                    handleAddPlot(chapter.id);
-                    setEditingPlot(null);
-                  }}
-                  className="px-2 py-1 text-sm text-primary hover:bg-primary/10 rounded"
+              return (
+                <div
+                  key={chapter.id}
+                  className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => handleChapterClick(chapter)}
                 >
-                  +
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </main>
+                  {/* 章节标题 */}
+                  <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                    <h3 className="font-medium text-gray-800 dark:text-white truncate">
+                      第{index + 1}章 {chapter.title || ''}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {totalCount > 0 ? `${completedCount}/${totalCount} 情节完成` : '暂无情节'}
+                    </p>
+                  </div>
 
-      {/* 情绪颜色说明 */}
-      <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 text-sm">
-        <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">◉ 圆形标记示意：</p>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-8 rounded border border-gray-300 overflow-hidden">
-              <div className="h-1/3 bg-green-500" />
-              <div className="h-1/3 bg-blue-400" />
-              <div className="h-1/3 bg-red-300" />
-            </div>
-            <span className="text-gray-600 dark:text-gray-400">情绪三段色</span>
+                  {/* 情节列表 */}
+                  <div className="p-3 max-h-48 overflow-y-auto">
+                    {chapterPlots.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic text-center py-4">
+                        点击进入添加情节
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {chapterPlots.slice(0, 5).map((plot, plotIndex) => (
+                          <div
+                            key={plot.id}
+                            className={`flex items-start gap-2 text-sm ${
+                              plot.completed ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <span className="text-gray-400 w-4 flex-shrink-0">
+                              {plotIndex + 1}.
+                            </span>
+                            <span
+                              className={`flex-1 ${
+                                plot.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              {plot.content.slice(0, 20)}
+                              {plot.content.length > 20 ? '...' : ''}
+                            </span>
+                            <EmotionCircle
+                              wordCountMet={plot.wordCountActual >= plot.wordCountTarget}
+                              expectedEmotion={plot.emotionColors?.expected || 'white'}
+                              actualEmotion={plot.emotionColors?.actual || 'white'}
+                              size="small"
+                              onEmotionChange={(type, colorId) =>
+                                handleEmotionChange(chapter.id, plot.id, type, colorId)
+                              }
+                            />
+                          </div>
+                        ))}
+                        {chapterPlots.length > 5 && (
+                          <p className="text-xs text-gray-400 text-center">
+                            还有 {chapterPlots.length - 5} 条...
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          深蓝(负面强) → 浅蓝(负面) → 白(中性) → 浅红(正面) → 深红(正面强)
-        </p>
-      </div>
+        ) : (
+          // 列表视图
+          <div className="space-y-4">
+            {chapters.map((chapter, index) => {
+              const chapterPlots = plots[chapter.id] || [];
+              const completedCount = chapterPlots.filter((p) => p.completed).length;
+
+              return (
+                <div
+                  key={chapter.id}
+                  className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden"
+                >
+                  <div
+                    className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between cursor-pointer"
+                    onClick={() => handleChapterClick(chapter)}
+                  >
+                    <h3 className="font-medium text-gray-800 dark:text-white">
+                      第{index + 1}章 {chapter.title || ''}
+                    </h3>
+                    <span className="text-sm text-gray-500">
+                      {completedCount}/{chapterPlots.length} 完成
+                    </span>
+                  </div>
+
+                  {chapterPlots.length > 0 && (
+                    <div className="p-4">
+                      <div className="space-y-2">
+                        {chapterPlots.map((plot, plotIndex) => (
+                          <div
+                            key={plot.id}
+                            className={`flex items-start gap-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 ${
+                              plot.completed ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <span className="text-gray-400 w-6">
+                              {plotIndex + 1}.
+                            </span>
+                            <span
+                              className={`flex-1 ${
+                                plot.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              {plot.content}
+                            </span>
+                            <EmotionCircle
+                              wordCountMet={plot.wordCountActual >= plot.wordCountTarget}
+                              expectedEmotion={plot.emotionColors?.expected || 'white'}
+                              actualEmotion={plot.emotionColors?.actual || 'white'}
+                              size="small"
+                              onEmotionChange={(type, colorId) =>
+                                handleEmotionChange(chapter.id, plot.id, type, colorId)
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

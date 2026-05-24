@@ -160,7 +160,7 @@ export function formatWordCount(count) {
 /**
  * 检查字数是否达标
  */
-export function isWordCount达标(current, target) {
+export function isWordCountMet(current, target) {
   return current >= target;
 }
 
@@ -176,7 +176,6 @@ export function truncate(text, maxLength, suffix = '...') {
  * 从文本中提取人物名称列表
  */
 export function extractCharacterNames(text, knownNames = []) {
-  // 简单的基于已知名字的匹配
   const results = [];
   knownNames.forEach((name) => {
     if (text.includes(name) && !results.includes(name)) {
@@ -197,11 +196,4 @@ export async function copyToClipboard(text) {
     console.error('复制失败:', err);
     return false;
   }
-}
-
-/**
- * 等待指定时间
- */
-export function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

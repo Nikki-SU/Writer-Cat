@@ -1,41 +1,63 @@
-// 右键菜单
+// 右键菜单组件
 import { useState, useEffect, useRef } from 'react';
 
-function ContextMenu({ x, y, onClose, onCopy, onCut, onPaste, onAiSummarize, onAiForeshadowBury, onAiForeshadowReveal }) {
+function ContextMenu({ editorRef, onSummarize, onExtractForeshadow }) {
+  const [visible, setVisible] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [selectedText, setSelectedText] = useState('');
   const menuRef = useRef(null);
-  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    // 点击外部关闭
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        onClose();
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      
+      // 获取选中文本
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || '';
+      
+      if (text) {
+        setSelectedText(text);
+        setPosition({ x: e.clientX, y: e.clientY });
+        setVisible(true);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
 
-  // 调整菜单位置确保在视口内
-  useEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+    const handleClick = () => {
+      setVisible(false);
+    };
 
-      if (rect.right > viewportWidth) {
-        menuRef.current.style.left = `${x - rect.width}px`;
-      }
-      if (rect.bottom > viewportHeight) {
-        menuRef.current.style.top = `${y - rect.height}px`;
-      }
-    }
-  }, [x, y]);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('click', handleClick);
 
-  const handleAction = (action) => {
-    action();
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('click', handleClick);
+    };
+  }, []);
+
+  // 处理菜单项点击
+  const handleMenuClick = (action) => {
     setVisible(false);
-    onClose();
+    
+    switch (action) {
+      case 'copy':
+        navigator.clipboard.writeText(selectedText);
+        break;
+      case 'cut':
+        navigator.clipboard.writeText(selectedText);
+        // TODO: 从编辑器删除选中文本
+        break;
+      case 'ai-summarize':
+        if (onSummarize) {
+          onSummarize(selectedText);
+        }
+        break;
+      case 'extract-foreshadow':
+        if (onExtractForeshadow) {
+          onExtractForeshadow(selectedText);
+        }
+        break;
+    }
   };
 
   if (!visible) return null;
@@ -43,51 +65,34 @@ function ContextMenu({ x, y, onClose, onCopy, onCut, onPaste, onAiSummarize, onA
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border dark:border-gray-700 py-1 min-w-[160px] animate-fadeIn"
-      style={{ left: x, top: y }}
+      className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-50 min-w-[160px]"
+      style={{ left: position.x, top: position.y }}
     >
       <button
-        onClick={() => handleAction(onCopy)}
-        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        onClick={() => handleMenuClick('copy')}
+        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
       >
-        复制
+        📋 复制
       </button>
       <button
-        onClick={() => handleAction(onCut)}
-        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        onClick={() => handleMenuClick('cut')}
+        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
       >
-        剪切
+        ✂️ 剪切
+      </button>
+      <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+      <button
+        onClick={() => handleMenuClick('ai-summarize')}
+        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-primary"
+      >
+        🧠 AI生成概括
       </button>
       <button
-        onClick={() => handleAction(onPaste)}
-        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        onClick={() => handleMenuClick('extract-foreshadow')}
+        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-primary"
       >
-        粘贴
+        🎯 设为伏笔（埋/圆）
       </button>
-      
-      <div className="border-t dark:border-gray-700 my-1" />
-      
-      <button
-        onClick={() => handleAction(onAiSummarize)}
-        className="w-full px-4 py-2 text-left text-sm text-primary hover:bg-primary/10"
-      >
-        📝 AI生成概括
-      </button>
-      
-      <div className="pl-4 space-y-1">
-        <button
-          onClick={() => handleAction(onAiForeshadowBury)}
-          className="w-full px-4 py-2 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          → 作为伏笔的"埋"
-        </button>
-        <button
-          onClick={() => handleAction(onAiForeshadowReveal)}
-          className="w-full px-4 py-2 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          → 作为伏笔的"圆"
-        </button>
-      </div>
     </div>
   );
 }
