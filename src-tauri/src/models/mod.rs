@@ -4,3 +4,4 @@ pub mod chapter;
 pub mod character;
 pub mod plot;
 pub mod structure;
+pub mod thread;

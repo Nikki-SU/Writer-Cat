@@ -38,11 +38,23 @@ pub fn run() {
             commands::character::get_character,
             commands::character::update_character,
             commands::character::delete_character,
+            // 人物关系命令
+            commands::character::create_relation,
+            commands::character::get_relations,
+            commands::character::update_relation,
+            commands::character::delete_relation,
+            // 人物时间线命令
+            commands::character::create_timeline_event,
+            commands::character::get_timeline,
+            commands::character::update_timeline_event,
+            commands::character::delete_timeline_event,
             // 情节相关命令
             commands::plot::create_plot_item,
             commands::plot::get_plot_items,
+            commands::plot::get_all_plot_items,
             commands::plot::update_plot_item,
             commands::plot::delete_plot_item,
+            commands::plot::reorder_plot_items,
             // 结构相关命令（伏笔+世界观）
             commands::structure::create_foreshadow,
             commands::structure::get_foreshadows,
@@ -50,16 +62,36 @@ pub fn run() {
             commands::structure::delete_foreshadow,
             commands::structure::create_worldview,
             commands::structure::get_worldviews,
+            commands::structure::get_worldview,
             commands::structure::update_worldview,
             commands::structure::delete_worldview,
+            commands::structure::attach_worldview_to_chapter,
+            commands::structure::detach_worldview_from_chapter,
+            commands::structure::get_worldview_chapters,
+            commands::structure::get_chapter_worldviews,
+            // 线索相关命令
+            commands::thread::create_thread,
+            commands::thread::get_threads,
+            commands::thread::get_thread,
+            commands::thread::update_thread,
+            commands::thread::delete_thread,
+            commands::thread::create_thread_node,
+            commands::thread::get_thread_nodes,
+            commands::thread::update_thread_node,
+            commands::thread::delete_thread_node,
+            commands::thread::reorder_thread_nodes,
             // AI相关命令
             commands::ai::check_spelling,
             commands::ai::detect_characters,
             commands::ai::summarize_text,
             commands::ai::generate_timeline,
+            commands::ai::check_worldview_conflict,
+            commands::ai::check_character_conflict,
             // 设置相关命令
             commands::settings::get_settings,
             commands::settings::update_settings,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running tauri application");

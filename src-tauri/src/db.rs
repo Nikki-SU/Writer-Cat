@@ -140,11 +140,15 @@ pub fn init_database(path: &Path) -> Result<()> {
         [],
     )?;
     
-    // 创建世界观-章节关联表
+    // 创建世界观-章节关联表（带position字段）
+    // 注意：worldview_chapters表需要特殊处理，因为原有表可能没有position字段
+    // 先尝试DROP再重建（如果表存在的话）
+    conn.execute("DROP TABLE IF EXISTS worldview_chapters", [])?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS worldview_chapters (
             worldview_id TEXT NOT NULL,
             chapter_id TEXT NOT NULL,
+            position TEXT DEFAULT '',
             PRIMARY KEY (worldview_id, chapter_id),
             FOREIGN KEY (worldview_id) REFERENCES worldviews(id) ON DELETE CASCADE,
             FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
@@ -157,6 +161,38 @@ pub fn init_database(path: &Path) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        )",
+        [],
+    )?;
+    
+    // 创建线索表
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS threads (
+            id TEXT PRIMARY KEY,
+            book_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT '线索',
+            resolved INTEGER DEFAULT 0,
+            resolved_chapter_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+    
+    // 创建线索节点表
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS thread_nodes (
+            id TEXT PRIMARY KEY,
+            thread_id TEXT NOT NULL,
+            chapter_id TEXT,
+            chapter_title TEXT,
+            content TEXT NOT NULL,
+            branch_label TEXT DEFAULT '',
+            order_index INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
         )",
         [],
     )?;
