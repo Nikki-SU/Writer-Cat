@@ -7,3 +7,4 @@ pub mod structure;
 pub mod thread;
 pub mod ai;
 pub mod settings;
+pub mod ollama;

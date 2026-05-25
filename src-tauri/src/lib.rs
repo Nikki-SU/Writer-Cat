@@ -92,6 +92,15 @@ pub fn run() {
             commands::settings::update_settings,
             commands::settings::get_setting,
             commands::settings::set_setting,
+            // Ollama相关命令
+            commands::ollama::check_ollama_status,
+            commands::ollama::install_ollama,
+            commands::ollama::start_ollama,
+            commands::ollama::pull_default_model,
+            commands::ollama::skip_ai_install,
+            commands::ollama::is_ai_skipped,
+            commands::ollama::is_first_launch,
+            commands::ollama::complete_first_launch,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running tauri application");

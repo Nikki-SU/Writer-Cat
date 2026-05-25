@@ -8,6 +8,7 @@ import {
   AI_PROVIDERS,
   DEFAULT_OLLAMA_MODEL,
 } from '../utils/constants';
+import OllamaInstaller from '../components/OllamaInstaller';
 
 function Settings() {
   const { settings, loadSettings, updateSettings } = useSettingsStore();
@@ -155,6 +156,9 @@ function Settings() {
 
             {settings.aiProvider === 'ollama' && (
               <>
+                {/* Ollama 状态与安装 */}
+                <OllamaInstaller />
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Ollama地址
