@@ -213,7 +213,7 @@ export default function WelcomeWizard({ onComplete }) {
             }`}
           />
         ))}
-      </div />
+      </div>
 
       {/* 步骤内容 */}
       <div className="h-full">
