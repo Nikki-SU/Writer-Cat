@@ -1,6 +1,6 @@
 // 章节卡片组件
 import { useState } from 'react';
-import EmotionCircle from './EmotionCircle';
+import EmotionCircle from '../common/EmotionCircle';
 
 function ChapterCard({ chapter, chapterNumber, plots, onUpdatePlot, onAddPlot }) {
   const [newPlotContent, setNewPlotContent] = useState('');

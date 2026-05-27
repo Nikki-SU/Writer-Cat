@@ -71,30 +71,24 @@ pub async fn update_plot(
     data: UpdatePlot,
 ) -> Result<Plot, String> {
     let now = Utc::now().to_rfc3339();
-    let mut updates = vec!["updated_at = ?".to_string()];
-    let mut params: Vec<String> = vec![now];
 
-    macro_rules! add_update {
-        ($field:expr, $value:expr) => {
-            if let Some(ref v) = $value {
-                updates.push(concat!(stringify!($field), " = ?"));
-                params.push(v.clone());
-            }
-        };
-    }
+    // 逐字段拼接 SQL，避免宏导致的类型不匹配
+    let mut set_clauses = vec!["updated_at = ?".to_string()];
+    let mut str_params: Vec<String> = vec![now.clone()];
+    let mut int_params: Vec<i32> = vec![];
 
-    add_update!(title, data.title);
-    add_update!(description, data.description);
-    add_update!(status, data.status);
-    add_update!(target_word_count, data.target_word_count);
-    add_update!(actual_word_count, data.actual_word_count);
-    add_update!(chapter_id, data.chapter_id);
+    // String 字段
+    if let Some(ref v) = data.title { set_clauses.push("title = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.description { set_clauses.push("description = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.status { set_clauses.push("status = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.chapter_id { set_clauses.push("chapter_id = ?".into()); str_params.push(v.clone()); }
+    // i32 字段 - 转为字符串绑定（SQLite 会自动转换）
+    if let Some(v) = data.target_word_count { set_clauses.push("target_word_count = ?".into()); str_params.push(v.to_string()); }
+    if let Some(v) = data.actual_word_count { set_clauses.push("actual_word_count = ?".into()); str_params.push(v.to_string()); }
 
-    let query = format!("UPDATE plots SET {} WHERE id = ?", updates.join(", "));
+    let query = format!("UPDATE plots SET {} WHERE id = ?", set_clauses.join(", "));
     let mut q = sqlx::query(&query);
-    for p in &params {
-        q = q.bind(p);
-    }
+    for p in &str_params { q = q.bind(p); }
     q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
 
     let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i32, i32, Option<String>, String, String)>(

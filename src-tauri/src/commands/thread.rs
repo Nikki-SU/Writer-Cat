@@ -206,28 +206,21 @@ pub async fn update_thread_node(
     data: UpdateThreadNode,
 ) -> Result<ThreadNode, String> {
     let now = Utc::now().to_rfc3339();
-    let mut updates = vec!["updated_at = ?".to_string()];
-    let mut params: Vec<String> = vec![now];
 
-    macro_rules! add_update {
-        ($field:expr, $value:expr) => {
-            if let Some(ref v) = $value {
-                updates.push(concat!(stringify!($field), " = ?"));
-                params.push(v.clone());
-            }
-        };
-    }
+    // 逐字段拼接 SQL，i32 字段转为字符串绑定
+    let mut set_clauses = vec!["updated_at = ?".to_string()];
+    let mut str_params: Vec<String> = vec![now];
 
-    add_update!(title, data.title);
-    add_update!(content, data.content);
-    add_update!(chapter_id, data.chapter_id);
-    add_update!(parent_node_id, data.parent_node_id);
-    add_update!(node_type, data.node_type);
-    add_update!(order_index, data.order_index);
+    if let Some(ref v) = data.title { set_clauses.push("title = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.content { set_clauses.push("content = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.chapter_id { set_clauses.push("chapter_id = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.parent_node_id { set_clauses.push("parent_node_id = ?".into()); str_params.push(v.clone()); }
+    if let Some(ref v) = data.node_type { set_clauses.push("node_type = ?".into()); str_params.push(v.clone()); }
+    if let Some(v) = data.order_index { set_clauses.push("order_index = ?".into()); str_params.push(v.to_string()); }
 
-    let query = format!("UPDATE thread_nodes SET {} WHERE id = ?", updates.join(", "));
+    let query = format!("UPDATE thread_nodes SET {} WHERE id = ?", set_clauses.join(", "));
     let mut q = sqlx::query(&query);
-    for p in &params {
+    for p in &str_params {
         q = q.bind(p);
     }
     q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;

@@ -1,7 +1,7 @@
 // 情节页网格卡片
 import { useState } from 'react';
 import ChapterCard from './ChapterCard';
-import EmotionCircle from './EmotionCircle';
+import EmotionCircle from '../common/EmotionCircle';
 
 function PlotGrid({ chapters, plots, onUpdatePlot, onAddPlot }) {
   return (
