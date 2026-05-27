@@ -74,7 +74,6 @@ pub fn run() {
             commands::character::delete_timeline_event,
             // 情节相关
             commands::plot::get_plots,
-            commands::character::get_characters,
             commands::plot::create_plot,
             commands::plot::update_plot,
             commands::plot::delete_plot,
