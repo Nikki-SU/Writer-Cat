@@ -205,8 +205,8 @@ function ThreadList() {
 
       {/* 添加线索弹窗 */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 w-80 shadow-xl">
+        <div className="fixed inset-0 z-50" onClick={() => setShowAddModal(false)}>
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-lg p-4 w-80 shadow-2xl border dark:border-gray-600" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
               添加线索/长伏笔
             </h3>

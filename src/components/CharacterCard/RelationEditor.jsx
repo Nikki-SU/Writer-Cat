@@ -36,8 +36,8 @@ function RelationEditor({ character, onClose, onUpdate }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-2xl border dark:border-gray-600" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-800 dark:text-white">
             {character.name} - 人物关系

@@ -3,7 +3,7 @@
 // 2. 支持 AI 检查结果标红（错别字=红色+下划线，世界观冲突=橙色，人设冲突=紫色）
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { EditorState, StateField, StateEffect } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine, Decoration, DecorationSet } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, Decoration } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';

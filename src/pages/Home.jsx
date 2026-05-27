@@ -43,7 +43,7 @@ export default function Home() {
         <h1 className="text-2xl font-bold text-body">我的书籍</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+          className="relative px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
         >
           + 新建书籍
         </button>
@@ -51,8 +51,8 @@ export default function Home() {
 
       {/* 新建弹窗 */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-xl animate-fadeIn">
+        <div className="fixed inset-0 z-50" onClick={() => setShowCreate(false)}>
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-white rounded-xl p-6 w-96 shadow-2xl border" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">新建书籍</h2>
             <input
               type="text"
