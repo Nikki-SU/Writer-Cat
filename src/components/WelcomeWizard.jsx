@@ -1,225 +1,115 @@
-// 首次启动引导向导
+// 欢迎引导页
 import { useState } from 'react';
-import OllamaInstaller from './OllamaInstaller';
-import * as ollamaApi from '../api/ollama';
-import * as bookApi from '../api/book';
+import useSettingsStore from '../stores/useSettingsStore';
 
-export default function WelcomeWizard({ onComplete }) {
-  const [step, setStep] = useState(1); // 1: 欢迎, 2: AI设置, 3: 创建书籍
-  const [bookName, setBookName] = useState('');
-  const [isCreatingBook, setIsCreatingBook] = useState(false);
-  const [bookError, setBookError] = useState(null);
+export default function WelcomeWizard() {
+  const { completeOnboarding, checkOllama } = useSettingsStore();
+  const [step, setStep] = useState(0);
+  const [ollamaStatus, setOllamaStatus] = useState(null);
 
-  // 完成引导
+  const steps = [
+    { title: '欢迎使用网文猫', content: '一个隐私优先的本地网文写作工具，帮助你管理书籍、章节、人物和情节。' },
+    { title: '隐私优先', content: '所有数据都保存在本地，不会上传到任何服务器。你的创作属于你自己。' },
+    { title: 'AI 辅助', content: '支持本地 AI (Ollama) 辅助写作，检查错别字、世界观冲突和人设问题。' },
+  ];
+
+  const handleNext = async () => {
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+    } else {
+      // 检查 Ollama
+      const status = await checkOllama();
+      setOllamaStatus(status);
+      setStep(step + 1);
+    }
+  };
+
   const handleComplete = async () => {
-    try {
-      await ollamaApi.completeFirstLaunch();
-      onComplete?.();
-    } catch (e) {
-      console.error('完成首次引导失败:', e);
-      onComplete?.();
-    }
+    await completeOnboarding();
+    window.location.reload();
   };
-
-  // 跳过创建书籍
-  const handleSkipBook = async () => {
-    await handleComplete();
-  };
-
-  // 创建书籍
-  const handleCreateBook = async () => {
-    if (!bookName.trim()) {
-      setBookError('请输入书名');
-      return;
-    }
-    
-    setIsCreatingBook(true);
-    setBookError(null);
-    
-    try {
-      await bookApi.createBook(bookName.trim());
-      await handleComplete();
-    } catch (e) {
-      console.error('创建书籍失败:', e);
-      setBookError('创建书籍失败: ' + e.toString());
-    } finally {
-      setIsCreatingBook(false);
-    }
-  };
-
-  // AI设置完成后的处理
-  const handleAiSetupDone = () => {
-    // 不管用户是否安装AI，都进入下一步
-    setStep(3);
-  };
-
-  // 步骤1: 欢迎页
-  const renderWelcome = () => (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <div className="text-7xl mb-6">🐱📖</div>
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
-        网文猫
-      </h1>
-      <p className="text-lg text-gray-600 dark:text-gray-300 mb-8">
-        隐私优先的本地网文写作工具
-      </p>
-      <p className="text-gray-500 dark:text-gray-400 mb-12">
-        你的文字，只属于你
-      </p>
-      
-      <div className="space-y-3 mb-12">
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-          <span className="text-xl">✅</span>
-          <span>数据完全本地存储</span>
-        </div>
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-          <span className="text-xl">✅</span>
-          <span>AI本地运行，保护隐私</span>
-        </div>
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-          <span className="text-xl">✅</span>
-          <span>同步走局域网，安全可控</span>
-        </div>
-      </div>
-      
-      <button
-        onClick={() => setStep(2)}
-        className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
-      >
-        开始使用
-        <span>→</span>
-      </button>
-    </div>
-  );
-
-  // 步骤2: AI引擎设置
-  const renderAiSetup = () => (
-    <div className="p-8 h-full flex flex-col">
-      <div className="flex-1">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2 flex items-center gap-3">
-          <span>🤖</span>
-          <span>AI写作助手</span>
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          AI可以帮你检查错别字、识别人物、提取伏笔、检测设定冲突。
-          <br />
-          AI引擎是本地运行的大模型，安装后不需要联网也能用。
-        </p>
-        
-        <OllamaInstaller onStatusChange={(status) => {
-          // 可以根据状态做一些处理
-        }} />
-      </div>
-      
-      <div className="flex justify-between items-center pt-6 border-t dark:border-gray-700">
-        <button
-          onClick={() => setStep(1)}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-        >
-          ← 上一步
-        </button>
-        <button
-          onClick={handleAiSetupDone}
-          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-        >
-          下一步 →
-        </button>
-      </div>
-    </div>
-  );
-
-  // 步骤3: 创建第一本书
-  const renderCreateBook = () => (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <div className="text-6xl mb-6">📖</div>
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-        创建你的第一本书
-      </h2>
-      <p className="text-gray-600 dark:text-gray-400 mb-8">
-        开始你的创作之旅
-      </p>
-      
-      <div className="w-full max-w-md">
-        <input
-          type="text"
-          value={bookName}
-          onChange={(e) => setBookName(e.target.value)}
-          placeholder="输入书名"
-          className="w-full px-4 py-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleCreateBook();
-          }}
-        />
-        
-        {bookError && (
-          <p className="mt-3 text-sm text-red-500">{bookError}</p>
-        )}
-      </div>
-      
-      <div className="mt-8 space-y-3">
-        <button
-          onClick={handleCreateBook}
-          disabled={isCreatingBook || !bookName.trim()}
-          className="w-full max-w-md px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-        >
-          {isCreatingBook ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              创建中...
-            </>
-          ) : (
-            <>
-              创建并开始写作
-              <span>→</span>
-            </>
-          )}
-        </button>
-        
-        <button
-          onClick={handleSkipBook}
-          disabled={isCreatingBook}
-          className="px-6 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-        >
-          跳过，稍后创建
-        </button>
-      </div>
-      
-      <button
-        onClick={() => setStep(2)}
-        className="absolute bottom-8 left-8 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-      >
-        ← AI设置
-      </button>
-    </div>
-  );
 
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900">
-      {/* 进度指示器 */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700">
-        <div
-          className="h-full bg-blue-500 transition-all duration-300"
-          style={{ width: `${(step / 3) * 100}%` }}
-        />
-      </div>
-      
-      {/* 步骤指示器 */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-        {[1, 2, 3].map((s) => (
-          <div
-            key={s}
-            className={`w-2 h-2 rounded-full transition-colors ${
-              s <= step ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          />
-        ))}
-      </div>
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-success/20">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4">
+        {/* 进度条 */}
+        <div className="flex gap-2 mb-8">
+          {[0, 1, 2, 3].map(i => (
+            <div
+              key={i}
+              className={`h-1 flex-1 rounded-full transition ${
+                i <= step ? 'bg-primary' : 'bg-gray-200'
+              }`}
+            />
+          ))}
+        </div>
 
-      {/* 步骤内容 */}
-      <div className="h-full">
-        {step === 1 && renderWelcome()}
-        {step === 2 && renderAiSetup()}
-        {step === 3 && renderCreateBook()}
+        {/* 内容 */}
+        <div className="min-h-[200px] flex flex-col items-center justify-center text-center">
+          {step < steps.length && (
+            <>
+              <h1 className="text-2xl font-bold text-body mb-4">{steps[step].title}</h1>
+              <p className="text-secondary leading-relaxed">{steps[step].content}</p>
+            </>
+          )}
+
+          {step === steps.length && (
+            <>
+              <h1 className="text-2xl font-bold text-body mb-4">设置 AI 助手</h1>
+              {ollamaStatus?.running ? (
+                <div className="text-center">
+                  <p className="text-4xl mb-4">✅</p>
+                  <p className="text-success font-medium">Ollama 已就绪！</p>
+                  <p className="text-sm text-secondary mt-2">你可以在设置中更换 AI 模型</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-4xl mb-4">🤖</p>
+                  <p className="text-body font-medium">暂未安装 Ollama</p>
+                  <p className="text-sm text-secondary mt-2">
+                    你可以跳过此步骤，之后在设置中安装
+                  </p>
+                  <a
+                    href="https://ollama.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm"
+                  >
+                    访问 Ollama 官网
+                  </a>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* 按钮 */}
+        <div className="flex justify-end gap-3 mt-8">
+          {step < steps.length && (
+            <button
+              onClick={handleNext}
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+            >
+              下一步
+            </button>
+          )}
+          {step === steps.length && (
+            <>
+              <button
+                onClick={handleComplete}
+                className="px-6 py-2 text-secondary hover:text-body transition"
+              >
+                跳过
+              </button>
+              <button
+                onClick={handleComplete}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+              >
+                开始使用
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

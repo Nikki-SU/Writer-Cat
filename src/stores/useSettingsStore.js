@@ -1,76 +1,90 @@
-// 设置状态管理
+// 设置 Store
 import { create } from 'zustand';
-import * as settingsApi from '../api/settings';
+import { settingsApi } from '../api/settings';
+import { aiApi } from '../api/ai';
 
-const defaultSettings = {
-  // 设备与同步
-  deviceRole: 'hub',
-  syncMode: 'manual',
-  autoClearPairing: false,
-  autoClearData: false,
-  
-  // AI设置
-  aiProvider: 'ollama',
-  ollamaUrl: 'http://localhost:11434',
-  ollamaModel: 'qwen2.5:7b',
-  apiKey: '',
-  apiEndpoint: '',
-  
-  // 通用设置
-  darkMode: false,
-  fontSize: 16,
-  language: 'zh-CN',
-  usbMode: false,
-  usbPath: '',
-};
-
-export const useSettingsStore = create((set, get) => ({
-  settings: { ...defaultSettings },
+const useSettingsStore = create((set, get) => ({
+  settings: {
+    theme: 'light',
+    device_role: 'standalone',
+    sync_enabled: false,
+    ai_provider: 'ollama',
+    ollama_url: 'http://localhost:11434',
+    ollama_model: 'qwen2.5:7b',
+    online_api_key: '',
+    online_api_url: '',
+    auto_save_interval: 500,
+    max_backups: 10,
+    font_size: 16,
+    first_launch: true,
+  },
+  ollamaStatus: null,
   loading: false,
-  error: null,
-  
+
   // 加载设置
   loadSettings: async () => {
-    set({ loading: true, error: null });
     try {
       const settings = await settingsApi.getSettings();
-      set({ settings: { ...defaultSettings, ...settings }, loading: false });
-    } catch (error) {
-      console.error('加载设置失败:', error);
-      set({ settings: { ...defaultSettings }, loading: false });
+      set({ settings });
+    } catch (e) {
+      console.error('加载设置失败:', e);
     }
   },
-  
+
   // 更新设置
-  updateSettings: async (updates) => {
-    const { settings } = get();
-    const newSettings = { ...settings, ...updates };
-    set({ settings: newSettings, loading: true, error: null });
-    
+  updateSettings: async (newSettings) => {
     try {
       await settingsApi.updateSettings(newSettings);
-      set({ loading: false });
-    } catch (error) {
-      console.error('保存设置失败:', error);
-      set({ error: error.message, loading: false });
+      set({ settings: newSettings });
+    } catch (e) {
+      console.error('保存设置失败:', e);
+      throw e;
     }
   },
-  
-  // 切换暗色模式
-  toggleDarkMode: () => {
-    const { settings, updateSettings } = get();
-    updateSettings({ darkMode: !settings.darkMode });
+
+  // 更新单个设置项
+  updateSetting: async (key, value) => {
+    const { settings } = get();
+    const newSettings = { ...settings, [key]: value };
+    await get().updateSettings(newSettings);
   },
-  
-  // 更新字体大小
-  setFontSize: (size) => {
-    const { updateSettings } = get();
-    updateSettings({ fontSize: size });
+
+  // 完成首次引导
+  completeOnboarding: async () => {
+    await get().updateSetting('first_launch', false);
   },
-  
-  // 重置设置
-  resetSettings: () => {
-    const { updateSettings } = get();
-    updateSettings(defaultSettings);
+
+  // 检查 Ollama 状态
+  checkOllama: async () => {
+    try {
+      const status = await aiApi.checkOllamaStatus();
+      set({ ollamaStatus: status });
+      return status;
+    } catch (e) {
+      console.error('检查 Ollama 失败:', e);
+      return null;
+    }
+  },
+
+  // 获取 Ollama 安装指引
+  getInstallGuide: async () => {
+    return aiApi.installOllama();
+  },
+
+  // 拉取模型
+  pullModel: async (model) => {
+    return aiApi.pullModel(model);
+  },
+
+  // 导出数据
+  exportData: async (bookId) => {
+    return settingsApi.exportData(bookId);
+  },
+
+  // 导入数据
+  importData: async (path) => {
+    return settingsApi.importData(path);
   },
 }));
+
+export default useSettingsStore;

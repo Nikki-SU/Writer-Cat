@@ -1,112 +1,151 @@
-// 书籍管理命令
-use crate::db::get_db_path;
-use crate::models::book::Book;
-use rusqlite::{params, Connection};
-use tauri::command;
+// 书籍相关命令 - 创建/切换/删除/重命名/文件系统操作
+use crate::models::{Book, CreateBook, UpdateBook};
+use crate::AppState;
+use tauri::State;
+use uuid::Uuid;
+use chrono::Utc;
 
-#[command]
-pub fn create_book(name: String) -> Result<Book, String> {
-    let book = Book::new(name);
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO books (id, name, created_at, updated_at, total_words, target_words) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![book.id, book.name, book.created_at, book.updated_at, book.total_words, book.target_words],
-    ).map_err(|e| e.to_string())?;
-    Ok(book)
-}
-
-#[command]
-pub fn get_books() -> Result<Vec<Book>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at, total_words, target_words FROM books ORDER BY updated_at DESC")
-        .map_err(|e| e.to_string())?;
+#[tauri::command]
+pub async fn create_book(
+    state: State<'_, AppState>,
+    data: CreateBook,
+) -> Result<Book, String> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
     
-    let books = stmt
-        .query_map([], |row| {
-            Ok(Book {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                created_at: row.get(2)?,
-                updated_at: row.get(3)?,
-                total_words: row.get(4)?,
-                target_words: row.get(5)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(books)
-}
-
-#[command]
-pub fn get_book(id: String) -> Result<Book, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at, total_words, target_words FROM books WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    stmt.query_row(params![id], |row| {
-        Ok(Book {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            created_at: row.get(2)?,
-            updated_at: row.get(3)?,
-            total_words: row.get(4)?,
-            target_words: row.get(5)?,
-        })
-    })
-    .map_err(|e| e.to_string())
-}
-
-#[command]
-pub fn update_book(id: String, name: String, total_words: Option<i32>, target_words: Option<i32>) -> Result<Book, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().to_rfc3339();
-    
-    // 先获取现有书籍
-    let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at, total_words, target_words FROM books WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let mut book: Book = stmt.query_row(params![id], |row| {
-        Ok(Book {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            created_at: row.get(2)?,
-            updated_at: row.get(3)?,
-            total_words: row.get(4)?,
-            target_words: row.get(5)?,
-        })
-    })
-    .map_err(|e| e.to_string())?;
-    
-    // 更新字段
-    book.name = name;
-    if let Some(tw) = total_words {
-        book.total_words = tw;
-    }
-    if let Some(tw) = target_words {
-        book.target_words = tw;
-    }
-    book.updated_at = now;
-    
-    // 保存更新
-    conn.execute(
-        "UPDATE books SET name = ?1, total_words = ?2, target_words = ?3, updated_at = ?4 WHERE id = ?5",
-        params![book.name, book.total_words, book.target_words, book.updated_at, book.id],
+    sqlx::query(
+        "INSERT INTO books (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
     )
+    .bind(&id)
+    .bind(&data.title)
+    .bind(&data.description)
+    .bind(&now)
+    .bind(&now)
+    .execute(&*state.db.lock().unwrap())
+    .await
     .map_err(|e| e.to_string())?;
-    
-    Ok(book)
+
+    // 创建书籍目录结构
+    let data_path = get_data_dir();
+    let book_dir = data_path.join("books").join(&id);
+    std::fs::create_dir_all(book_dir.join("assets")).map_err(|e| e.to_string())?;
+
+    Ok(Book {
+        id,
+        title: data.title,
+        description: data.description,
+        created_at: now.clone(),
+        updated_at: now,
+    })
 }
 
-#[command]
-pub fn delete_book(id: String) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    // 由于使用了ON DELETE CASCADE，外键关联会自动删除
-    conn.execute("DELETE FROM books WHERE id = ?1", params![id])
+#[tauri::command]
+pub async fn get_books(state: State<'_, AppState>) -> Result<Vec<Book>, String> {
+    let rows = sqlx::query_as::<_, (String, String, Option<String>, String, String)>(
+        "SELECT id, title, description, created_at, updated_at FROM books ORDER BY updated_at DESC"
+    )
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, description, created_at, updated_at)| Book {
+            id,
+            title,
+            description,
+            created_at,
+            updated_at,
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn get_book(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Book, String> {
+    let row = sqlx::query_as::<_, (String, String, Option<String>, String, String)>(
+        "SELECT id, title, description, created_at, updated_at FROM books WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Book {
+        id: row.0,
+        title: row.1,
+        description: row.2,
+        created_at: row.3,
+        updated_at: row.4,
+    })
+}
+
+#[tauri::command]
+pub async fn update_book(
+    state: State<'_, AppState>,
+    id: String,
+    data: UpdateBook,
+) -> Result<Book, String> {
+    let now = Utc::now().to_rfc3339();
+    
+    let mut updates = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<String> = vec![now.clone()];
+
+    if let Some(ref title) = data.title {
+        updates.push("title = ?".to_string());
+        params.push(title.clone());
+    }
+    if let Some(ref desc) = data.description {
+        updates.push("description = ?".to_string());
+        params.push(desc.clone());
+    }
+
+    let query = format!(
+        "UPDATE books SET {} WHERE id = ?",
+        updates.join(", ")
+    );
+    
+    let mut q = sqlx::query(&query);
+    for p in &params {
+        q = q.bind(p);
+    }
+    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+
+    get_book(state, id).await
+}
+
+#[tauri::command]
+pub async fn delete_book(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    // 删除数据库记录
+    sqlx::query("DELETE FROM books WHERE id = ?")
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
         .map_err(|e| e.to_string())?;
+
+    // 删除书籍目录
+    let data_path = get_data_dir();
+    let book_dir = data_path.join("books").join(&id);
+    if book_dir.exists() {
+        std::fs::remove_dir_all(book_dir).map_err(|e| e.to_string())?;
+    }
+
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_data_path() -> Result<String, String> {
+    Ok(get_data_dir().to_string_lossy().to_string())
+}
+
+fn get_data_dir() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("writer-cat")
+        .join("data")
 }

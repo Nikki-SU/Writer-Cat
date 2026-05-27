@@ -1,127 +1,52 @@
-// 情绪圆形组件 - 3段色标记
-import { useState, useRef, useEffect } from 'react';
-import { EMOTION_COLORS } from '../../utils/constants';
-
-// 情绪颜色映射
-const EMOTION_MAP = {
-  'deep-blue': { color: '#1e3a5f', name: '负面强' },
-  'light-blue': { color: '#93c5fd', name: '负面' },
-  'white': { color: '#f8fafc', name: '中性' },
-  'light-red': { color: '#fca5a5', name: '正面' },
-  'deep-red': { color: '#dc2626', name: '正面强' },
+// 情绪圆环组件
+// 5色情绪：深蓝(1)→浅蓝(2)→白(3)→浅红(4)→深红(5)
+const EMOTION_COLORS = {
+  1: '#1A237E', // 深蓝-平静
+  2: '#64B5F6', // 浅蓝-愉悦
+  3: '#FFFFFF', // 白-一般
+  4: '#EF9A9A', // 浅红-紧张
+  5: '#B71C1C', // 深红-激烈
 };
 
-function EmotionCircle({ 
-  wordCountMet, 
-  expectedEmotion = 'white', 
-  actualEmotion = 'white',
-  wordCountActual = 0,
-  wordCountTarget = 3000,
-  onEmotionChange,
-  size = 'normal' // 'small' | 'normal'
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [activeSection, setActiveSection] = useState(null);
-  const pickerRef = useRef(null);
-
-  const sizeConfig = {
-    small: { width: 16, height: 8, segmentHeight: 2 },
-    normal: { width: 24, height: 12, segmentHeight: 3 },
-  };
-
-  const config = sizeConfig[size] || sizeConfig.normal;
-
-  // 点击外部关闭选择器
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
-        setShowPicker(false);
-      }
-    };
-
-    if (showPicker) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showPicker]);
-
-  const handleSectionClick = (section, e) => {
-    e.stopPropagation();
-    setActiveSection(section);
-    setShowPicker(true);
-  };
-
-  const handleColorSelect = (colorId) => {
-    if (onEmotionChange && activeSection) {
-      onEmotionChange(activeSection, colorId);
-    }
-    setShowPicker(false);
-    setActiveSection(null);
-  };
-
-  const getEmotionColor = (emotionId) => {
-    return EMOTION_MAP[emotionId]?.color || EMOTION_MAP.white.color;
-  };
-
-  const wordCountColor = wordCountMet ? 'light-red' : 'light-blue';
+export default function EmotionCircle({ expected, actual, size = 60 }) {
+  // 计算颜色（基于实际情绪）
+  const actualColor = EMOTION_COLORS[actual] || '#FFFFFF';
+  const borderColor = actual <= 2 ? '#1A237E' : actual >= 4 ? '#B71C1C' : '#8491B4';
 
   return (
-    <div className="relative inline-flex flex-col" style={{ width: config.width, gap: '1px' }}>
-      {/* 上段：字数达标 */}
-      <button
-        onClick={(e) => handleSectionClick('wordCount', e)}
-        className="rounded-t-full border border-gray-300 hover:opacity-80 transition-opacity"
-        style={{ 
-          backgroundColor: getEmotionColor(wordCountColor),
-          height: config.segmentHeight
-        }}
-        title={`字数: ${wordCountActual}/${wordCountTarget}`}
-      />
-
-      {/* 中段：预计情绪 */}
-      <button
-        onClick={(e) => handleSectionClick('expected', e)}
-        className="border-x border-gray-300 hover:opacity-80 transition-opacity"
-        style={{ 
-          backgroundColor: getEmotionColor(expectedEmotion),
-          height: config.segmentHeight
-        }}
-        title={`预计情绪: ${EMOTION_MAP[expectedEmotion]?.name || '中性'}`}
-      />
-
-      {/* 下段：实际情绪 */}
-      <button
-        onClick={(e) => handleSectionClick('actual', e)}
-        className="rounded-b-full border border-gray-300 hover:opacity-80 transition-opacity"
-        style={{ 
-          backgroundColor: getEmotionColor(actualEmotion),
-          height: config.segmentHeight
-        }}
-        title={`实际情绪: ${EMOTION_MAP[actualEmotion]?.name || '中性'}`}
-      />
-
-      {/* 颜色选择器 */}
-      {showPicker && (
+    <div
+      className="relative rounded-full overflow-hidden"
+      style={{
+        width: size,
+        height: size,
+        border: `3px solid ${borderColor}`,
+        background: actualColor,
+      }}
+    >
+      {/* 三段指示器 */}
+      <div className="absolute inset-0 flex flex-col">
+        {/* 上段 - 字数达标 */}
         <div
-          ref={pickerRef}
-          className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 p-2 z-50 flex gap-1"
-        >
-          {EMOTION_COLORS.map((emotion) => (
-            <button
-              key={emotion.id}
-              onClick={() => handleColorSelect(emotion.id)}
-              className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
-              style={{ backgroundColor: emotion.color }}
-              title={emotion.name}
-            />
-          ))}
+          className="flex-1"
+          style={{
+            background: expected >= actual ? 'rgba(0, 160, 135, 0.3)' : 'rgba(230, 75, 53, 0.3)',
+          }}
+        />
+        {/* 中段 - 预计情绪 */}
+        <div className="h-1/3 flex items-center justify-center">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: EMOTION_COLORS[expected] }}
+          />
         </div>
-      )}
+        {/* 下段 - 实际情绪 */}
+        <div className="h-1/3 flex items-center justify-center">
+          <div
+            className="w-2 h-2 rounded-full border border-gray-400"
+            style={{ backgroundColor: actualColor }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
-
-export default EmotionCircle;

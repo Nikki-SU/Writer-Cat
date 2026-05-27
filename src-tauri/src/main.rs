@@ -1,5 +1,4 @@
-// Tauri 入口文件
-// Prevents additional console window on Windows in release
+// Writer-Cat 入口文件
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {

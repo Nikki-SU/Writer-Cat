@@ -1,184 +1,114 @@
-// 设置管理命令
+// 设置相关命令
+use crate::commands::book::get_data_dir;
+use crate::AppState;
 use serde::{Deserialize, Serialize};
-use tauri::command;
-use crate::db::get_db_path;
-use rusqlite::{params, Connection};
+use std::fs;
+use tauri::State;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AppSettings {
-    // 设备与同步
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    pub theme: String,
     pub device_role: String,
-    pub sync_mode: String,
-    pub auto_clear_pairing: bool,
-    pub auto_clear_data: bool,
-    
-    // AI设置
+    pub sync_enabled: bool,
     pub ai_provider: String,
     pub ollama_url: String,
     pub ollama_model: String,
-    pub api_key: String,
-    pub api_endpoint: String,
-    
-    // 通用设置
-    pub dark_mode: bool,
+    pub online_api_key: String,
+    pub online_api_url: String,
+    pub auto_save_interval: i32,
+    pub max_backups: i32,
     pub font_size: i32,
-    pub language: String,
-    pub usb_mode: bool,
-    pub usb_path: String,
+    pub first_launch: bool,
 }
 
-impl Default for AppSettings {
+impl Default for Settings {
     fn default() -> Self {
         Self {
-            device_role: "hub".to_string(),
-            sync_mode: "manual".to_string(),
-            auto_clear_pairing: false,
-            auto_clear_data: false,
+            theme: "light".to_string(),
+            device_role: "standalone".to_string(),
+            sync_enabled: false,
             ai_provider: "ollama".to_string(),
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "qwen2.5:7b".to_string(),
-            api_key: String::new(),
-            api_endpoint: String::new(),
-            dark_mode: false,
+            online_api_key: "".to_string(),
+            online_api_url: "".to_string(),
+            auto_save_interval: 500,
+            max_backups: 10,
             font_size: 16,
-            language: "zh-CN".to_string(),
-            usb_mode: false,
-            usb_path: String::new(),
+            first_launch: true,
         }
     }
 }
 
-impl AppSettings {
-    fn to_key_values(&self) -> Vec<(&'static str, String)> {
-        vec![
-            ("device_role", self.device_role.clone()),
-            ("sync_mode", self.sync_mode.clone()),
-            ("auto_clear_pairing", self.auto_clear_pairing.to_string()),
-            ("auto_clear_data", self.auto_clear_data.to_string()),
-            ("ai_provider", self.ai_provider.clone()),
-            ("ollama_url", self.ollama_url.clone()),
-            ("ollama_model", self.ollama_model.clone()),
-            ("api_key", self.api_key.clone()),
-            ("api_endpoint", self.api_endpoint.clone()),
-            ("dark_mode", self.dark_mode.to_string()),
-            ("font_size", self.font_size.to_string()),
-            ("language", self.language.clone()),
-            ("usb_mode", self.usb_mode.to_string()),
-            ("usb_path", self.usb_path.clone()),
-        ]
-    }
-    
-    fn from_key_values(values: &std::collections::HashMap<String, String>) -> Self {
-        let mut settings = AppSettings::default();
-        
-        if let Some(v) = values.get("device_role") {
-            settings.device_role = v.clone();
-        }
-        if let Some(v) = values.get("sync_mode") {
-            settings.sync_mode = v.clone();
-        }
-        if let Some(v) = values.get("auto_clear_pairing") {
-            settings.auto_clear_pairing = v.parse().unwrap_or(false);
-        }
-        if let Some(v) = values.get("auto_clear_data") {
-            settings.auto_clear_data = v.parse().unwrap_or(false);
-        }
-        if let Some(v) = values.get("ai_provider") {
-            settings.ai_provider = v.clone();
-        }
-        if let Some(v) = values.get("ollama_url") {
-            settings.ollama_url = v.clone();
-        }
-        if let Some(v) = values.get("ollama_model") {
-            settings.ollama_model = v.clone();
-        }
-        if let Some(v) = values.get("api_key") {
-            settings.api_key = v.clone();
-        }
-        if let Some(v) = values.get("api_endpoint") {
-            settings.api_endpoint = v.clone();
-        }
-        if let Some(v) = values.get("dark_mode") {
-            settings.dark_mode = v.parse().unwrap_or(false);
-        }
-        if let Some(v) = values.get("font_size") {
-            settings.font_size = v.parse().unwrap_or(16);
-        }
-        if let Some(v) = values.get("language") {
-            settings.language = v.clone();
-        }
-        if let Some(v) = values.get("usb_mode") {
-            settings.usb_mode = v.parse().unwrap_or(false);
-        }
-        if let Some(v) = values.get("usb_path") {
-            settings.usb_path = v.clone();
-        }
-        
-        settings
-    }
-}
-
-fn load_settings_from_db() -> std::collections::HashMap<String, String> {
-    let conn = Connection::open(get_db_path()).ok();
-    if conn.is_none() {
-        return std::collections::HashMap::new();
-    }
-    let conn = conn.unwrap();
-    
-    let mut map = std::collections::HashMap::new();
-    let mut stmt = conn.prepare("SELECT key, value FROM settings").ok();
-    if stmt.is_none() {
-        return map;
-    }
-    let stmt = stmt.unwrap();
-    
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    });
-    
-    if let Ok(rows) = rows {
-        for row in rows.flatten() {
-            map.insert(row.0, row.1);
-        }
-    }
-    
-    map
-}
-
-fn save_setting_to_db(key: &str, value: &str) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-        params![key, value],
+#[tauri::command]
+pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT value FROM settings WHERE key = 'global'"
     )
+    .fetch_optional(&*state.db.lock().unwrap())
+    .await
     .map_err(|e| e.to_string())?;
+
+    match row {
+        Some((value,)) => serde_json::from_str(&value).map_err(|e| e.to_string()),
+        None => Ok(Settings::default()),
+    }
+}
+
+#[tauri::command]
+pub async fn update_settings(
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> Result<(), String> {
+    let value = serde_json::to_string(&settings).map_err(|e| e.to_string())?;
+
+    sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('global', ?)")
+        .bind(&value)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }
 
-#[command]
-pub fn get_settings() -> Result<AppSettings, String> {
-    let values = load_settings_from_db();
-    Ok(AppSettings::from_key_values(&values))
+#[tauri::command]
+pub async fn export_data(
+    book_id: Option<String>,
+) -> Result<String, String> {
+    use std::io::Write;
+    use zip::write::FileOptions;
+    use zip::ZipWriter;
+
+    let data_path = get_data_dir();
+    let export_path = data_path.join("export").join("data_export.json");
+    fs::create_dir_all(export_path.parent().unwrap()).map_err(|e| e.to_string())?;
+
+    // 这里简化处理，实际应该导出完整数据
+    let export_data = serde_json::json!({
+        "version": "2.0.0",
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "book_id": book_id
+    });
+
+    let file = fs::File::create(&export_path).map_err(|e| e.to_string())?;
+    let mut zip = ZipWriter::new(file);
+    let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    zip.start_file("data.json", options).map_err(|e| e.to_string())?;
+    zip.write_all(serde_json::to_string_pretty(&export_data).unwrap().as_bytes())
+        .map_err(|e| e.to_string())?;
+
+    zip.finish().map_err(|e| e.to_string())?;
+
+    Ok(export_path.to_string_lossy().to_string())
 }
 
-#[command]
-pub fn update_settings(settings: AppSettings) -> Result<AppSettings, String> {
-    for (key, value) in settings.to_key_values() {
-        save_setting_to_db(key, &value)?;
-    }
-    Ok(settings)
-}
-
-#[command]
-pub fn get_setting(key: String) -> Result<String, String> {
-    let values = load_settings_from_db();
-    values
-        .get(&key)
-        .cloned()
-        .ok_or_else(|| format!("设置项 '{}' 不存在", key))
-}
-
-#[command]
-pub fn set_setting(key: String, value: String) -> Result<(), String> {
-    save_setting_to_db(&key, &value)
+#[tauri::command]
+pub async fn import_data(
+    import_path: String,
+) -> Result<(), String> {
+    // 简化处理，实际应该解析 zip 并导入数据
+    let content = fs::read_to_string(&import_path).map_err(|e| e.to_string())?;
+    let _data: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    Ok(())
 }

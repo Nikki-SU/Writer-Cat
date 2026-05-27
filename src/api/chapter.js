@@ -1,55 +1,40 @@
-// 章节API封装
+// 章节 API
 import { invoke } from '@tauri-apps/api/core';
 
-/**
- * 创建新章节
- * @param {string} bookId - 书籍ID
- * @param {string} title - 章节标题
- * @param {number} orderIndex - 排序索引
- * @returns {Promise<Chapter>}
- */
-export async function createChapter(bookId, title, orderIndex) {
-  return await invoke('create_chapter', { bookId, title, orderIndex });
-}
-
-/**
- * 获取书籍的所有章节
- * @param {string} bookId - 书籍ID
- * @returns {Promise<Chapter[]>}
- */
-export async function getChapters(bookId) {
-  return await invoke('get_chapters', { bookId });
-}
-
-/**
- * 获取单个章节
- * @param {string} id - 章节ID
- * @returns {Promise<Chapter>}
- */
-export async function getChapter(id) {
-  return await invoke('get_chapter', { id });
-}
-
-/**
- * 更新章节
- * @param {string} id - 章节ID
- * @param {object} updates - 更新内容
- * @returns {Promise<Chapter>}
- */
-export async function updateChapter(id, updates) {
-  return await invoke('update_chapter', { 
-    id, 
-    title: updates.title || null,
-    content: updates.content || null,
-    wordCount: updates.wordCount || null,
-  });
-}
-
-/**
- * 删除章节
- * @param {string} id - 章节ID
- * @returns {Promise<void>}
- */
-export async function deleteChapter(id) {
-  return await invoke('delete_chapter', { id });
-}
+export const chapterApi = {
+  // 获取章节列表
+  getChapters: (bookId) => invoke('get_chapters', { bookId }),
+  
+  // 获取单个章节
+  getChapter: (id) => invoke('get_chapter', { id }),
+  
+  // 创建章节
+  createChapter: (data) => invoke('create_chapter', { data }),
+  
+  // 更新章节
+  updateChapter: (id, data) => invoke('update_chapter', { id, data }),
+  
+  // 删除章节
+  deleteChapter: (id) => invoke('delete_chapter', { id }),
+  
+  // 重新排序章节
+  reorderChapters: (data) => invoke('reorder_chapters', { data }),
+  
+  // 读取章节内容
+  readContent: (id) => invoke('read_chapter_content', { id }),
+  
+  // 写入章节内容（自动保存）
+  writeContent: (id, content) => invoke('write_chapter_content', { id, content }),
+  
+  // 获取备份列表
+  getBackups: (id) => invoke('get_backups', { id }),
+  
+  // 恢复备份
+  restoreBackup: (id, backupPath) => invoke('restore_backup', { id, backupPath }),
+  
+  // 导出单章
+  exportChapter: (id) => invoke('export_chapter', { id }),
+  
+  // 导出整书
+  exportBook: (bookId) => invoke('export_book', { bookId }),
+};

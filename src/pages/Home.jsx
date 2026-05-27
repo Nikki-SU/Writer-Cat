@@ -1,216 +1,84 @@
-// 首页
-import { Link, useNavigate } from 'react-router-dom';
-import { useBookStore } from '../stores/useBookStore';
+// 首页 - 书籍选择
 import { useEffect, useState } from 'react';
+import useBookStore from '../stores/useBookStore';
+import useSettingsStore from '../stores/useSettingsStore';
 
-function Home() {
-  const navigate = useNavigate();
+export default function Home() {
   const { books, currentBook, loadBooks, selectBook, createBook, deleteBook } = useBookStore();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newBookName, setNewBookName] = useState('');
+  const { settings } = useSettingsStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
 
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]);
+  }, []);
 
-  const handleCreateBook = async () => {
-    if (!newBookName.trim()) return;
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
     try {
-      const book = await createBook(newBookName.trim());
-      setNewBookName('');
-      setShowCreateModal(false);
-      // 选择新创建的书籍并进入写作页
-      await selectBook(book.id);
-      navigate('/writer');
-    } catch (error) {
-      console.error('创建书籍失败:', error);
+      const book = await createBook(newTitle.trim(), newDesc.trim() || null);
+      setShowCreate(false);
+      setNewTitle('');
+      setNewDesc('');
+      selectBook(book);
+    } catch (e) {
+      console.error('创建失败:', e);
     }
   };
 
-  const handleDeleteBook = async (e, bookId) => {
+  const handleDelete = async (e, book) => {
     e.stopPropagation();
-    if (window.confirm('确定要删除这本书吗？此操作不可恢复。')) {
-      await deleteBook(bookId);
+    if (!confirm(`确定删除《${book.title}》？此操作不可恢复！`)) return;
+    try {
+      await deleteBook(book.id);
+    } catch (e) {
+      console.error('删除失败:', e);
     }
-  };
-
-  const handleSelectBook = async (bookId) => {
-    await selectBook(bookId);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 顶部导航 */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🐱📖</span>
-            <h1 className="text-xl font-bold text-gray-800 dark:text-white">网文猫</h1>
-          </div>
-          {currentBook && (
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600 dark:text-gray-300">
-                当前: {currentBook.name}
-              </span>
-              <select
-                className="px-3 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                value={currentBook.id}
-                onChange={(e) => handleSelectBook(e.target.value)}
-              >
-                {books.map((book) => (
-                  <option key={book.id} value={book.id}>
-                    {book.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </header>
+    <div className="p-8 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-body">我的书籍</h1>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+        >
+          + 新建书籍
+        </button>
+      </div>
 
-      {/* 主内容 */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* 功能入口卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Link
-            to="/plot"
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">📝</span>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">情节</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">情节-情绪图</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link
-            to="/structure"
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🏗️</span>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">结构</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">伏笔 + 世界观</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link
-            to="/character"
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">👤</span>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">人物</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">人物卡片 + 关系图</p>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        {/* 写作按钮 */}
-        {currentBook && (
-          <div className="mb-8">
-            <button
-              onClick={() => navigate('/writer')}
-              className="w-full bg-primary hover:bg-primary/90 text-white text-lg font-semibold py-6 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3"
-            >
-              <span className="text-2xl">✍️</span>
-              开始写作
-            </button>
-          </div>
-        )}
-
-        {/* 书籍列表 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-          <div className="px-6 py-4 border-b dark:border-gray-700 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">我的书籍</h2>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              + 新建书籍
-            </button>
-          </div>
-
-          {books.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-500 dark:text-gray-400 mb-4">还没有书籍</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                创建第一本书
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y dark:divide-gray-700">
-              {books.map((book) => (
-                <div
-                  key={book.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                  onClick={() => handleSelectBook(book.id)}
-                >
-                  <div>
-                    <h3 className="font-medium text-gray-800 dark:text-white">{book.name}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {book.total_words || 0} 字 · {book.chapters?.length || 0} 章
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteBook(e, book.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                    title="删除"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* 创建书籍弹窗 */}
-      {showCreateModal && (
+      {/* 新建弹窗 */}
+      {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-              新建书籍
-            </h3>
+          <div className="bg-white rounded-xl p-6 w-96 shadow-xl animate-fadeIn">
+            <h2 className="text-xl font-bold mb-4">新建书籍</h2>
             <input
               type="text"
-              value={newBookName}
-              onChange={(e) => setNewBookName(e.target.value)}
-              placeholder="输入书籍名称"
-              className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+              placeholder="书名"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
               autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateBook()}
+            />
+            <textarea
+              placeholder="简介（可选）"
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={3}
             />
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setNewBookName('');
-                }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                onClick={() => setShowCreate(false)}
+                className="px-4 py-2 text-secondary hover:text-body transition"
               >
                 取消
               </button>
               <button
-                onClick={handleCreateBook}
-                disabled={!newBookName.trim()}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                onClick={handleCreate}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 创建
               </button>
@@ -218,8 +86,49 @@ function Home() {
           </div>
         </div>
       )}
+
+      {/* 书籍列表 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {books.map((book) => (
+          <div
+            key={book.id}
+            onClick={() => selectBook(book)}
+            className={`p-4 rounded-xl border cursor-pointer transition ${
+              currentBook?.id === book.id
+                ? 'border-primary bg-primary/5'
+                : 'border-gray-200 hover:border-primary/50 hover:shadow-md'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-bold text-lg text-body">{book.title}</h3>
+                {book.description && (
+                  <p className="text-sm text-secondary mt-1 line-clamp-2">
+                    {book.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={(e) => handleDelete(e, book)}
+                className="text-secondary hover:text-error transition"
+                title="删除"
+              >
+                🗑️
+              </button>
+            </div>
+            <div className="mt-3 text-xs text-secondary">
+              创建于 {new Date(book.created_at).toLocaleDateString()}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {books.length === 0 && (
+        <div className="text-center py-16 text-secondary">
+          <p className="text-4xl mb-4">📚</p>
+          <p>还没有书籍，点击上方按钮创建第一本吧！</p>
+        </div>
+      )}
     </div>
   );
 }
-
-export default Home;

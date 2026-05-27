@@ -1,302 +1,253 @@
 // 设置页
-import { Link } from 'react-router-dom';
-import { useSettingsStore } from '../stores/useSettingsStore';
-import { useEffect } from 'react';
-import {
-  DEVICE_ROLES,
-  SYNC_MODES,
-  AI_PROVIDERS,
-  DEFAULT_OLLAMA_MODEL,
-} from '../utils/constants';
+import { useEffect, useState } from 'react';
+import useSettingsStore from '../stores/useSettingsStore';
 import OllamaInstaller from '../components/OllamaInstaller';
 
-function Settings() {
-  const { settings, loadSettings, updateSettings } = useSettingsStore();
+export default function Settings() {
+  const { settings, updateSettings, ollamaStatus, checkOllama } = useSettingsStore();
+  const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    checkOllama();
+  }, []);
 
-  const handleToggle = (key) => {
-    updateSettings({ [key]: !settings[key] });
-  };
-
-  const handleSelect = (key, value) => {
-    updateSettings({ [key]: value });
+  const handleChange = (key, value) => {
+    updateSettings({ ...settings, [key]: value });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 顶部导航 */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            ← 返回
-          </Link>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">设置</h1>
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold text-body mb-6">设置</h1>
+
+      {/* 标签页 */}
+      <div className="flex gap-4 border-b mb-6">
+        {[
+          { key: 'general', label: '通用' },
+          { key: 'ai', label: 'AI 设置' },
+          { key: 'sync', label: '同步' },
+          { key: 'data', label: '数据' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 font-medium transition ${
+              activeTab === tab.key
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-secondary hover:text-body'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 通用设置 */}
+      {activeTab === 'general' && (
+        <div className="space-y-4">
+          <SettingItem label="主题">
+            <select
+              value={settings.theme}
+              onChange={(e) => handleChange('theme', e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </SettingItem>
+
+          <SettingItem label="字体大小">
+            <input
+              type="number"
+              value={settings.font_size}
+              onChange={(e) => handleChange('font_size', parseInt(e.target.value))}
+              className="px-3 py-2 border rounded-lg w-20"
+              min={12}
+              max={24}
+            />
+            <span className="ml-2 text-secondary">px</span>
+          </SettingItem>
+
+          <SettingItem label="自动保存间隔">
+            <input
+              type="number"
+              value={settings.auto_save_interval}
+              onChange={(e) => handleChange('auto_save_interval', parseInt(e.target.value))}
+              className="px-3 py-2 border rounded-lg w-24"
+              min={300}
+              max={5000}
+              step={100}
+            />
+            <span className="ml-2 text-secondary">ms</span>
+          </SettingItem>
+
+          <SettingItem label="备份保留数量">
+            <input
+              type="number"
+              value={settings.max_backups}
+              onChange={(e) => handleChange('max_backups', parseInt(e.target.value))}
+              className="px-3 py-2 border rounded-lg w-20"
+              min={5}
+              max={50}
+            />
+            <span className="ml-2 text-secondary">个</span>
+          </SettingItem>
         </div>
-      </header>
+      )}
 
-      {/* 设置内容 */}
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* 设备与同步 */}
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-              设备与同步
-            </h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                本设备角色
-              </label>
-              <div className="space-y-2">
-                {DEVICE_ROLES.map((role) => (
-                  <label
-                    key={role.value}
-                    className="flex items-start gap-3 p-3 rounded-lg border dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <input
-                      type="radio"
-                      name="deviceRole"
-                      value={role.value}
-                      checked={settings.deviceRole === role.value}
-                      onChange={() => handleSelect('deviceRole', role.value)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="font-medium text-gray-800 dark:text-white">{role.label}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{role.description}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
+      {/* AI 设置 */}
+      {activeTab === 'ai' && (
+        <div className="space-y-4">
+          <SettingItem label="AI 提供商">
+            <select
+              value={settings.ai_provider}
+              onChange={(e) => handleChange('ai_provider', e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="ollama">Ollama (本地)</option>
+              <option value="online">在线 API</option>
+              <option value="none">不使用 AI</option>
+            </select>
+          </SettingItem>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                同步模式
-              </label>
-              <select
-                value={settings.syncMode}
-                onChange={(e) => handleSelect('syncMode', e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                {SYNC_MODES.map((mode) => (
-                  <option key={mode.value} value={mode.value}>
-                    {mode.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {settings.ai_provider === 'ollama' && (
+            <>
+              <SettingItem label="Ollama 状态">
+                <span className={ollamaStatus?.running ? 'text-success' : 'text-error'}>
+                  {ollamaStatus?.running ? '✅ 运行中' : '❌ 未运行'}
+                </span>
+              </SettingItem>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white">关闭时清除配对码</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">退出时自动清除所有配对码</p>
-              </div>
-              <button
-                onClick={() => handleToggle('autoClearPairing')}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  settings.autoClearPairing ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    settings.autoClearPairing ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
+              {ollamaStatus?.installed && !ollamaStatus?.running && (
+                <div className="p-3 bg-warning/10 rounded-lg text-sm">
+                  Ollama 已安装但未运行。请在终端运行 <code>ollama serve</code> 启动。
+                </div>
+              )}
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white">关闭时清除本设备数据</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">退出时自动清除本地数据</p>
-              </div>
-              <button
-                onClick={() => handleToggle('autoClearData')}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  settings.autoClearData ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    settings.autoClearData ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* AI设置 */}
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">AI设置</h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                AI提供商
-              </label>
-              <select
-                value={settings.aiProvider}
-                onChange={(e) => handleSelect('aiProvider', e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                {AI_PROVIDERS.map((provider) => (
-                  <option key={provider.value} value={provider.value}>
-                    {provider.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {settings.aiProvider === 'ollama' && (
-              <>
-                {/* Ollama 状态与安装 */}
+              {!ollamaStatus?.installed && (
                 <OllamaInstaller />
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ollama地址
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.ollamaUrl}
-                    onChange={(e) => handleSelect('ollamaUrl', e.target.value)}
-                    placeholder="http://localhost:11434"
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    模型名称
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.ollamaModel}
-                    onChange={(e) => handleSelect('ollamaModel', e.target.value)}
-                    placeholder={DEFAULT_OLLAMA_MODEL}
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-              </>
-            )}
+              )}
 
-            {(settings.aiProvider === 'openai' || settings.aiProvider === 'deepseek' || settings.aiProvider === 'custom') && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={settings.apiKey}
-                    onChange={(e) => handleSelect('apiKey', e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    API端点
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.apiEndpoint}
-                    onChange={(e) => handleSelect('apiEndpoint', e.target.value)}
-                    placeholder="https://api.openai.com/v1"
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* 通用设置 */}
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">通用设置</h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white">夜间模式</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">开启后界面将变为深色</p>
-              </div>
-              <button
-                onClick={() => handleToggle('darkMode')}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  settings.darkMode ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    settings.darkMode ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
+              <SettingItem label="Ollama 地址">
+                <input
+                  type="text"
+                  value={settings.ollama_url}
+                  onChange={(e) => handleChange('ollama_url', e.target.value)}
+                  className="px-3 py-2 border rounded-lg flex-1"
                 />
-              </button>
-            </div>
+              </SettingItem>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                编辑器字体大小
-              </label>
-              <select
-                value={settings.fontSize}
-                onChange={(e) => handleSelect('fontSize', Number(e.target.value))}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value={14}>14px</option>
-                <option value={16}>16px</option>
-                <option value={18}>18px</option>
-                <option value={20}>20px</option>
-                <option value={24}>24px</option>
-              </select>
-            </div>
+              <SettingItem label="模型">
+                <select
+                  value={settings.ollama_model}
+                  onChange={(e) => handleChange('ollama_model', e.target.value)}
+                  className="px-3 py-2 border rounded-lg flex-1"
+                >
+                  {ollamaStatus?.models?.map(m => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  )) || (
+                    <option value="qwen2.5:7b">qwen2.5:7b</option>
+                  )}
+                </select>
+              </SettingItem>
+            </>
+          )}
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white">U盘模式</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">数据存储在可移动存储设备</p>
-              </div>
-              <button
-                onClick={() => handleToggle('usbMode')}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  settings.usbMode ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    settings.usbMode ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
+          {settings.ai_provider === 'online' && (
+            <>
+              <SettingItem label="API 地址">
+                <input
+                  type="text"
+                  value={settings.online_api_url}
+                  onChange={(e) => handleChange('online_api_url', e.target.value)}
+                  placeholder="https://api.openai.com/v1"
+                  className="px-3 py-2 border rounded-lg flex-1"
                 />
-              </button>
-            </div>
-          </div>
-        </section>
+              </SettingItem>
 
-        {/* 关于 */}
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">关于</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-600 dark:text-gray-400">
-              网文猫 v1.0.0
+              <SettingItem label="API Key">
+                <input
+                  type="password"
+                  value={settings.online_api_key}
+                  onChange={(e) => handleChange('online_api_key', e.target.value)}
+                  className="px-3 py-2 border rounded-lg flex-1"
+                />
+              </SettingItem>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 同步设置 */}
+      {activeTab === 'sync' && (
+        <div className="space-y-4">
+          <SettingItem label="设备角色">
+            <select
+              value={settings.device_role}
+              onChange={(e) => handleChange('device_role', e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="standalone">独立设备</option>
+              <option value="hub">Hub（主设备）</option>
+              <option value="leaf">Leaf（从设备）</option>
+            </select>
+          </SettingItem>
+
+          {settings.device_role !== 'standalone' && (
+            <SettingItem label="启用同步">
+              <input
+                type="checkbox"
+                checked={settings.sync_enabled}
+                onChange={(e) => handleChange('sync_enabled', e.target.checked)}
+                className="w-5 h-5"
+              />
+            </SettingItem>
+          )}
+
+          {settings.device_role === 'standalone' && (
+            <div className="p-4 bg-gray-50 rounded-lg text-sm text-secondary">
+              当前为独立设备模式，数据存储在本地。如需多设备同步，请选择 Hub 或 Leaf 角色。
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 数据设置 */}
+      {activeTab === 'data' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-medium mb-2">导出数据</h3>
+            <p className="text-sm text-secondary mb-3">
+              将所有书籍数据导出为压缩文件，可用于备份或迁移。
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              隐私优先的本地网文写作工具
-            </p>
+            <button
+              onClick={() => useSettingsStore.getState().exportData(null)}
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm"
+            >
+              导出全部数据
+            </button>
           </div>
-        </section>
-      </main>
+
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-medium mb-2">导入数据</h3>
+            <p className="text-sm text-secondary mb-3">
+              从备份文件导入数据。
+            </p>
+            <label className="px-4 py-2 bg-secondary text-white rounded-lg text-sm cursor-pointer inline-block">
+              选择文件
+              <input type="file" className="hidden" accept=".zip,.json" />
+            </label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default Settings;
+function SettingItem({ label, children }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-body">{label}</span>
+      <div className="flex items-center">{children}</div>
+    </div>
+  );
+}

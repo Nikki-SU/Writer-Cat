@@ -1,547 +1,211 @@
-// 结构页 - 伏笔管理 + 线索/长伏笔管理 + 世界观管理
-import { Link } from 'react-router-dom';
+// 结构页 - 伏笔双向互锁 + 世界观
 import { useEffect, useState } from 'react';
-import { useBookStore } from '../stores/useBookStore';
-import { useStructureStore } from '../stores/useStructureStore';
-import ThreadFlow from '../components/common/ThreadFlow';
+import useBookStore from '../stores/useBookStore';
+import useStructureStore from '../stores/useStructureStore';
 
-function Structure() {
-  const { currentBook, chapters, loadBooks, selectBook } = useBookStore();
+export default function Structure() {
+  const { currentBook, chapters } = useBookStore();
   const {
-    foreshadows,
-    worldviews,
-    threads,
-    threadNodes,
-    loadForeshadows,
-    loadWorldviews,
-    loadThreads,
-    loadThreadNodes,
-    createForeshadow,
-    updateForeshadow,
-    deleteForeshadow,
-    createWorldview,
-    updateWorldview,
-    deleteWorldview,
-    attachWorldview,
-    detachWorldview,
-    createThread,
-    updateThread,
-    deleteThread,
-    getIncompleteForeshadows,
-    getCompletedForeshadows,
-    getIncompleteThreads,
-    getCompletedThreads,
+    foreshadows, worldviews, threads,
+    loadStructures, createForeshadow, resolveForeshadow, deleteForeshadow,
+    createWorldview, deleteWorldview, mountWorldview,
+    createThread, deleteThread
   } = useStructureStore();
+  
+  const [activeTab, setActiveTab] = useState('foreshadow');
+  const [showCreateFS, setShowCreateFS] = useState(false);
+  const [newFSTitle, setNewFSTitle] = useState('');
+  const [newFSDesc, setNewFSDesc] = useState('');
 
-  const [activeTab, setActiveTab] = useState('foreshadow'); // 'foreshadow' | 'thread' | 'worldview'
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalType, setAddModalType] = useState('foreshadow'); // 'foreshadow' | 'worldview' | 'thread'
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [newThreadType, setNewThreadType] = useState('linear');
-  const [expandedForeshadow, setExpandedForeshadow] = useState(null);
-  const [expandedThread, setExpandedThread] = useState(null);
-  const [showCompleted, setShowCompleted] = useState(false);
-
-  useEffect(() => {
-    loadBooks();
-  }, [loadBooks]);
-
-  // 加载数据
   useEffect(() => {
     if (currentBook) {
-      loadForeshadows(currentBook.id);
-      loadWorldviews(currentBook.id);
-      loadThreads(currentBook.id);
+      loadStructures(currentBook.id);
     }
-  }, [currentBook, loadForeshadows, loadWorldviews, loadThreads]);
+  }, [currentBook]);
 
-  // 打开添加弹窗
-  const openAddModal = (type) => {
-    setAddModalType(type);
-    setNewItemName('');
-    setNewItemDesc('');
-    setNewThreadType('linear');
-    setShowAddModal(true);
+  // 获取章节标题
+  const getChapterTitle = (chapterId) => {
+    const ch = chapters.find(c => c.id === chapterId);
+    return ch ? ch.title : '未关联';
   };
 
-  // 添加伏笔
-  const handleAddForeshadow = async () => {
-    if (!newItemName.trim() || !currentBook) return;
+  const handleCreateForeshadow = async () => {
+    if (!newFSTitle.trim()) return;
     try {
-      await createForeshadow({
-        bookId: currentBook.id,
-        name: newItemName.trim(),
-        buryChapterId: null,
-        buryChapterTitle: null,
-        buryContent: null,
-      });
-      setShowAddModal(false);
-    } catch (error) {
-      console.error('创建伏笔失败:', error);
+      await createForeshadow(currentBook.id, newFSTitle.trim(), newFSDesc.trim() || null, null);
+      setShowCreateFS(false);
+      setNewFSTitle('');
+      setNewFSDesc('');
+    } catch (e) {
+      console.error('创建伏笔失败:', e);
     }
   };
 
-  // 完成伏笔
-  const handleCompleteForeshadow = async (foreshadowId) => {
-    // TODO: 打开编辑弹窗让用户填写圆伏笔
-    try {
-      await updateForeshadow(foreshadowId, { completed: true });
-    } catch (error) {
-      console.error('完成伏笔失败:', error);
+  const handleResolveForeshadow = async (fsId) => {
+    // 简单处理：随机选择一个章节作为解决章节
+    if (chapters.length > 0) {
+      const randomChapter = chapters[Math.floor(Math.random() * chapters.length)];
+      await resolveForeshadow(fsId, randomChapter.id);
     }
   };
-
-  // 添加世界观
-  const handleAddWorldview = async () => {
-    if (!newItemName.trim() || !currentBook) return;
-    try {
-      await createWorldview({
-        bookId: currentBook.id,
-        name: newItemName.trim(),
-        description: newItemDesc.trim(),
-      });
-      setShowAddModal(false);
-    } catch (error) {
-      console.error('创建世界观失败:', error);
-    }
-  };
-
-  // 添加线索
-  const handleAddThread = async () => {
-    if (!newItemName.trim() || !currentBook) return;
-    try {
-      await createThread({
-        bookId: currentBook.id,
-        name: newItemName.trim(),
-        threadType: newThreadType,
-      });
-      setShowAddModal(false);
-    } catch (error) {
-      console.error('创建线索失败:', error);
-    }
-  };
-
-  // 完成线索
-  const handleResolveThread = async (threadId) => {
-    try {
-      await updateThread(threadId, { resolved: true });
-    } catch (error) {
-      console.error('完成线索失败:', error);
-    }
-  };
-
-  // 展开线索节点
-  const handleExpandThread = async (threadId) => {
-    if (expandedThread === threadId) {
-      setExpandedThread(null);
-    } else {
-      setExpandedThread(threadId);
-      if (!threadNodes[threadId]) {
-        await loadThreadNodes(threadId);
-      }
-    }
-  };
-
-  if (!currentBook) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">请先选择一本书</p>
-          <Link to="/" className="text-primary hover:underline">
-            返回首页
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const incompleteForeshadows = getIncompleteForeshadows();
-  const completedForeshadows = getCompletedForeshadows();
-  const incompleteThreads = getIncompleteThreads();
-  const completedThreads = getCompletedThreads();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 顶部导航 */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            ← 返回
-          </Link>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">结构</h1>
-          <span className="text-gray-500">/ {currentBook.name}</span>
-        </div>
-      </header>
-
-      {/* 标签切换 */}
-      <div className="max-w-4xl mx-auto px-4 py-4">
-        <div className="flex gap-4 border-b dark:border-gray-700">
-          {[
-            { key: 'foreshadow', label: '🎯 伏笔', count: incompleteForeshadows.length },
-            { key: 'thread', label: '🧵 线索', count: incompleteThreads.length },
-            { key: 'worldview', label: '🌍 世界观', count: worldviews.length },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`pb-2 px-2 font-medium transition-colors flex items-center gap-2 ${
-                activeTab === tab.key
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 dark:text-gray-400'
-              }`}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span className="px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 rounded-full">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+    <div className="p-6 h-full flex flex-col">
+      {/* 标签页 */}
+      <div className="flex gap-4 border-b mb-4">
+        {[
+          { key: 'foreshadow', label: '📌 伏笔' },
+          { key: 'worldview', label: '🌍 世界观' },
+          { key: 'thread', label: '🔗 线索' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 font-medium transition ${
+              activeTab === tab.key
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-secondary hover:text-body'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* 主内容 */}
-      <main className="max-w-4xl mx-auto px-4 py-4">
-        {/* 伏笔管理 */}
-        {activeTab === 'foreshadow' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                未完成的伏笔 ({incompleteForeshadows.length})
-              </h2>
-              <button
-                onClick={() => openAddModal('foreshadow')}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-              >
-                + 添加伏笔
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {incompleteForeshadows.map((foreshadow) => (
-                <div
-                  key={foreshadow.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400">▫</span>
-                        <span className="font-medium text-gray-800 dark:text-white">
-                          {foreshadow.name}
-                        </span>
-                      </div>
-                      {foreshadow.bury_chapter_title && (
-                        <p className="text-sm text-gray-500 mt-1 ml-6">
-                          埋: {foreshadow.bury_chapter_title}
-                        </p>
-                      )}
-                      {foreshadow.bury_content && (
-                        <p className="text-sm text-gray-400 mt-1 ml-6">
-                          "{foreshadow.bury_content.slice(0, 50)}..."
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleCompleteForeshadow(foreshadow.id)}
-                        className="px-3 py-1 text-sm text-success hover:bg-success/10 rounded"
-                      >
-                        ✓ 圆
-                      </button>
-                      <button
-                        onClick={() => deleteForeshadow(foreshadow.id)}
-                        className="px-3 py-1 text-sm text-error hover:bg-error/10 rounded"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {incompleteForeshadows.length === 0 && (
-                <p className="text-center text-gray-400 py-8">暂无未完成的伏笔</p>
-              )}
-            </div>
-
-            {/* 已完成 */}
-            {completedForeshadows.length > 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setShowCompleted(!showCompleted)}
-                  className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <span>{showCompleted ? '▼' : '▶'}</span>
-                  <span>已完成的伏笔 ({completedForeshadows.length})</span>
-                </button>
-                {showCompleted && (
-                  <div className="mt-2 space-y-2 opacity-60">
-                    {completedForeshadows.map((foreshadow) => (
-                      <div
-                        key={foreshadow.id}
-                        className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 line-through"
-                      >
-                        <span className="text-gray-500">{foreshadow.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+      {/* 伏笔面板 */}
+      {activeTab === 'foreshadow' && (
+        <div className="flex-1 overflow-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold">伏笔列表</h2>
+            <button
+              onClick={() => setShowCreateFS(true)}
+              className="px-3 py-1 bg-primary text-white rounded-lg text-sm"
+            >
+              + 新建伏笔
+            </button>
           </div>
-        )}
 
-        {/* 线索管理 */}
-        {activeTab === 'thread' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                未完成的线索 ({incompleteThreads.length})
-              </h2>
-              <button
-                onClick={() => openAddModal('thread')}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+          {/* 伏笔卡片列表 */}
+          <div className="space-y-3">
+            {foreshadows.map(fs => (
+              <div
+                key={fs.id}
+                className={`p-4 rounded-lg border ${
+                  fs.status === 'resolved' ? 'border-success/50 bg-success/5' : 'border-gray-200'
+                }`}
               >
-                + 添加线索
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {incompleteThreads.map((thread) => {
-                const nodes = threadNodes[thread.id] || [];
-                const isExpanded = expandedThread === thread.id;
-                const threadType = thread.thread_type || 'linear';
-
-                return (
-                  <div
-                    key={thread.id}
-                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-                  >
-                    <div
-                      className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                      onClick={() => handleExpandThread(thread.id)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">
-                          {threadType === 'linear' ? '📍' : threadType === 'branch' ? '🌳' : '🔀'}
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold">{fs.title}</h3>
+                      {fs.status === 'resolved' && (
+                        <span className="px-2 py-0.5 bg-success text-white text-xs rounded">
+                          已解决
                         </span>
-                        <span className="font-medium text-gray-800 dark:text-white">
-                          {thread.name}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          ({nodes.length} 节点)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResolveThread(thread.id);
-                          }}
-                          className="px-2 py-1 text-xs text-success hover:bg-success/10 rounded"
-                        >
-                          完成
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteThread(thread.id);
-                          }}
-                          className="px-2 py-1 text-xs text-error hover:bg-error/10 rounded"
-                        >
-                          删除
-                        </button>
-                        <span className="text-gray-400">
-                          {isExpanded ? '▲' : '▼'}
-                        </span>
-                      </div>
+                      )}
                     </div>
-
-                    {isExpanded && (
-                      <div className="border-t dark:border-gray-700">
-                        <ThreadFlow
-                          thread={thread}
-                          nodes={nodes}
-                          onNodeClick={(node) => console.log('点击节点:', node)}
-                        />
-                      </div>
+                    {fs.description && (
+                      <p className="text-sm text-secondary mt-1">{fs.description}</p>
                     )}
-                  </div>
-                );
-              })}
-              {incompleteThreads.length === 0 && (
-                <p className="text-center text-gray-400 py-8">暂无未完成的线索</p>
-              )}
-            </div>
-
-            {/* 已完成 */}
-            {completedThreads.length > 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setShowCompleted(!showCompleted)}
-                  className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <span>{showCompleted ? '▼' : '▶'}</span>
-                  <span>已完成的线索 ({completedThreads.length})</span>
-                </button>
-                {showCompleted && (
-                  <div className="mt-2 space-y-2 opacity-60">
-                    {completedThreads.map((thread) => (
-                      <div
-                        key={thread.id}
-                        className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 line-through"
-                      >
-                        <span className="text-gray-500">{thread.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 世界观管理 */}
-        {activeTab === 'worldview' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                世界观 ({worldviews.length})
-              </h2>
-              <button
-                onClick={() => openAddModal('worldview')}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-              >
-                + 添加世界观
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {worldviews.map((worldview) => (
-                <div
-                  key={worldview.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span>🌍</span>
-                        <span className="font-medium text-gray-800 dark:text-white">
-                          {worldview.name}
-                        </span>
-                      </div>
-                      {worldview.description && (
-                        <p className="text-sm text-gray-500 mt-2">
-                          {worldview.description}
-                        </p>
+                    
+                    {/* 双向互锁显示 */}
+                    <div className="flex items-center gap-4 mt-2 text-sm">
+                      <span className="text-secondary">
+                        🕳️ 埋: {getChapterTitle(fs.buried_chapter_id)}
+                      </span>
+                      {fs.resolved_chapter_id && (
+                        <>
+                          <span>→</span>
+                          <span className="text-success">
+                            ✨ 圆: {getChapterTitle(fs.resolved_chapter_id)}
+                          </span>
+                        </>
                       )}
                     </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {fs.status !== 'resolved' && (
+                      <button
+                        onClick={() => handleResolveForeshadow(fs.id)}
+                        className="px-2 py-1 text-sm bg-success text-white rounded hover:bg-success/90"
+                      >
+                        标记解决
+                      </button>
+                    )}
                     <button
-                      onClick={() => deleteWorldview(worldview.id)}
-                      className="text-error hover:bg-error/10 px-2 py-1 rounded text-sm"
+                      onClick={() => deleteForeshadow(fs.id)}
+                      className="px-2 py-1 text-sm text-error hover:bg-error/10 rounded"
                     >
                       删除
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-            {worldviews.length === 0 && (
-              <p className="text-center text-gray-400 py-8">暂无世界观</p>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* 添加弹窗 */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
-              {addModalType === 'foreshadow' && '添加伏笔'}
-              {addModalType === 'worldview' && '添加世界观'}
-              {addModalType === 'thread' && '添加线索'}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  名称
-                </label>
-                <input
-                  type="text"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="输入名称..."
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  autoFocus
-                />
               </div>
+            ))}
+          </div>
 
-              {addModalType === 'worldview' && (
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    描述
-                  </label>
-                  <textarea
-                    value={newItemDesc}
-                    onChange={(e) => setNewItemDesc(e.target.value)}
-                    placeholder="输入描述..."
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {addModalType === 'thread' && (
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    类型
-                  </label>
-                  <div className="flex gap-2">
-                    {[
-                      { key: 'linear', icon: '📍', label: '线性' },
-                      { key: 'branch', icon: '🌳', label: '分支' },
-                      { key: 'converge', icon: '🔀', label: '收束' },
-                    ].map((type) => (
-                      <button
-                        key={type.key}
-                        onClick={() => setNewThreadType(type.key)}
-                        className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
-                          newThreadType === type.key
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
-                        }`}
-                      >
-                        {type.icon} {type.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {foreshadows.length === 0 && (
+            <div className="text-center py-12 text-secondary">
+              <p>还没有伏笔，开始埋下你的第一个伏笔吧！</p>
             </div>
+          )}
+        </div>
+      )}
 
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={
-                  addModalType === 'foreshadow'
-                    ? handleAddForeshadow
-                    : addModalType === 'worldview'
-                    ? handleAddWorldview
-                    : handleAddThread
-                }
-                disabled={!newItemName.trim()}
-                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                创建
-              </button>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg"
-              >
+      {/* 世界观面板 */}
+      {activeTab === 'worldview' && (
+        <div className="flex-1 overflow-auto">
+          <WorldviewPanel
+            worldviews={worldviews}
+            chapters={chapters}
+            onCreate={(title, content, category) => 
+              createWorldview(currentBook.id, title, content, category)
+            }
+            onDelete={deleteWorldview}
+            onMount={mountWorldview}
+          />
+        </div>
+      )}
+
+      {/* 线索面板 */}
+      {activeTab === 'thread' && (
+        <div className="flex-1 overflow-auto">
+          <ThreadPanel
+            threads={threads}
+            chapters={chapters}
+            onCreate={(title, type) => createThread(currentBook.id, title, type)}
+            onDelete={deleteThread}
+          />
+        </div>
+      )}
+
+      {/* 新建伏笔弹窗 */}
+      {showCreateFS && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-xl animate-fadeIn">
+            <h2 className="text-xl font-bold mb-4">新建伏笔</h2>
+            <input
+              type="text"
+              placeholder="伏笔标题"
+              value={newFSTitle}
+              onChange={(e) => setNewFSTitle(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+              autoFocus
+            />
+            <textarea
+              placeholder="伏笔描述（可选）"
+              value={newFSDesc}
+              onChange={(e) => setNewFSDesc(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={3}
+            />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowCreateFS(false)} className="px-4 py-2 text-secondary">
                 取消
+              </button>
+              <button onClick={handleCreateForeshadow} className="px-4 py-2 bg-primary text-white rounded-lg">
+                创建
               </button>
             </div>
           </div>
@@ -551,4 +215,184 @@ function Structure() {
   );
 }
 
-export default Structure;
+// 世界观子组件
+function WorldviewPanel({ worldviews, chapters, onCreate, onDelete, onMount }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    await onCreate(newTitle.trim(), newContent.trim() || null, newCategory.trim() || null);
+    setShowCreate(false);
+    setNewTitle('');
+    setNewContent('');
+    setNewCategory('');
+  };
+
+  // 按分类分组
+  const grouped = worldviews.reduce((acc, w) => {
+    const cat = w.category || '未分类';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(w);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold">世界观设定</h2>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="px-3 py-1 bg-primary text-white rounded-lg text-sm"
+        >
+          + 新建条目
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="p-4 bg-gray-50 rounded-lg mb-4">
+          <input
+            type="text"
+            placeholder="分类"
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg mb-2"
+          />
+          <input
+            type="text"
+            placeholder="标题"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg mb-2"
+            autoFocus
+          />
+          <textarea
+            placeholder="内容"
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg mb-3"
+            rows={3}
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowCreate(false)} className="px-3 py-1 text-secondary">取消</button>
+            <button onClick={handleCreate} className="px-3 py-1 bg-primary text-white rounded-lg">保存</button>
+          </div>
+        </div>
+      )}
+
+      {Object.entries(grouped).map(([category, items]) => (
+        <div key={category} className="mb-4">
+          <h3 className="text-sm font-bold text-secondary mb-2">{category}</h3>
+          <div className="space-y-2">
+            {items.map(w => (
+              <div key={w.id} className="p-3 bg-white rounded-lg border">
+                <div className="flex justify-between">
+                  <span className="font-medium">{w.title}</span>
+                  <button onClick={() => onDelete(w.id)} className="text-error text-sm">删除</button>
+                </div>
+                {w.content && <p className="text-sm text-secondary mt-1">{w.content}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 线索子组件
+function ThreadPanel({ threads, chapters, onCreate, onDelete }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newType, setNewType] = useState('linear');
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    await onCreate(newTitle.trim(), newType);
+    setShowCreate(false);
+    setNewTitle('');
+  };
+
+  const typeLabels = {
+    linear: '线性',
+    branch: '分支',
+    converge: '收束',
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold">线索/长伏笔</h2>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="px-3 py-1 bg-primary text-white rounded-lg text-sm"
+        >
+          + 新建线索
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="p-4 bg-gray-50 rounded-lg mb-4">
+          <input
+            type="text"
+            placeholder="线索标题"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg mb-2"
+            autoFocus
+          />
+          <div className="flex gap-4 mb-3">
+            {[
+              { key: 'linear', label: '🔗 线性' },
+              { key: 'branch', label: '🌳 分支' },
+              { key: 'converge', label: '🔄 收束' },
+            ].map(t => (
+              <label key={t.key} className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="threadType"
+                  value={t.key}
+                  checked={newType === t.key}
+                  onChange={(e) => setNewType(e.target.value)}
+                />
+                {t.label}
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowCreate(false)} className="px-3 py-1 text-secondary">取消</button>
+            <button onClick={handleCreate} className="px-3 py-1 bg-primary text-white rounded-lg">创建</button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {threads.map(t => (
+          <div key={t.id} className="p-4 bg-white rounded-lg border">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="font-bold">{t.title}</span>
+                <span className="ml-2 text-sm text-secondary">
+                  {typeLabels[t.thread_type] || '线性'}
+                </span>
+              </div>
+              <button onClick={() => onDelete(t.id)} className="text-error text-sm">删除</button>
+            </div>
+            {/* 节点列表 */}
+            {t.nodes?.length > 0 && (
+              <div className="mt-2 pl-4 border-l-2 border-primary/30">
+                {t.nodes.map(node => (
+                  <div key={node.id} className="text-sm py-1">
+                    • {node.title}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

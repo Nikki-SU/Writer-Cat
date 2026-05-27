@@ -1,145 +1,215 @@
-// 情节管理命令
-use crate::db::get_db_path;
-use crate::models::plot::PlotItem;
-use rusqlite::{params, Connection};
-use tauri::command;
+// 情节相关命令 - CRUD + 情绪标记
+use crate::models::*;
+use crate::AppState;
+use tauri::State;
+use uuid::Uuid;
+use chrono::Utc;
 
-#[command]
-pub fn create_plot_item(
-    chapter_id: String,
+#[tauri::command]
+pub async fn get_plots(
+    state: State<'_, AppState>,
     book_id: String,
-    content: String,
-    order_index: i32,
-) -> Result<PlotItem, String> {
-    let plot_item = PlotItem::new(chapter_id, book_id, content, order_index);
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO plot_items (id, chapter_id, book_id, content, completed, order_index, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![
-            plot_item.id,
-            plot_item.chapter_id,
-            plot_item.book_id,
-            plot_item.content,
-            plot_item.completed as i32,
-            plot_item.order_index,
-            plot_item.created_at
-        ],
-    ).map_err(|e| e.to_string())?;
-    
-    Ok(plot_item)
-}
-
-#[command]
-pub fn get_plot_items(chapter_id: String) -> Result<Vec<PlotItem>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, chapter_id, book_id, content, completed, order_index, created_at FROM plot_items WHERE chapter_id = ?1 ORDER BY order_index")
-        .map_err(|e| e.to_string())?;
-    
-    let plot_items = stmt
-        .query_map(params![chapter_id], |row| {
-            let completed: i32 = row.get(4)?;
-            Ok(PlotItem {
-                id: row.get(0)?,
-                chapter_id: row.get(1)?,
-                book_id: row.get(2)?,
-                content: row.get(3)?,
-                completed: completed != 0,
-                order_index: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(plot_items)
-}
-
-#[command]
-pub fn get_all_plot_items(book_id: String) -> Result<Vec<PlotItem>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, chapter_id, book_id, content, completed, order_index, created_at FROM plot_items WHERE book_id = ?1 ORDER BY chapter_id, order_index")
-        .map_err(|e| e.to_string())?;
-    
-    let plot_items = stmt
-        .query_map(params![book_id], |row| {
-            let completed: i32 = row.get(4)?;
-            Ok(PlotItem {
-                id: row.get(0)?,
-                chapter_id: row.get(1)?,
-                book_id: row.get(2)?,
-                content: row.get(3)?,
-                completed: completed != 0,
-                order_index: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(plot_items)
-}
-
-#[command]
-pub fn update_plot_item(id: String, content: String, completed: Option<bool>) -> Result<PlotItem, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    
-    // 先获取现有情节
-    let mut stmt = conn
-        .prepare("SELECT id, chapter_id, book_id, content, completed, order_index, created_at FROM plot_items WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let mut plot_item: PlotItem = stmt.query_row(params![id], |row| {
-        let completed_int: i32 = row.get(4)?;
-        Ok(PlotItem {
-            id: row.get(0)?,
-            chapter_id: row.get(1)?,
-            book_id: row.get(2)?,
-            content: row.get(3)?,
-            completed: completed_int != 0,
-            order_index: row.get(5)?,
-            created_at: row.get(6)?,
-        })
-    })
-    .map_err(|e| e.to_string())?;
-    
-    // 更新字段
-    plot_item.content = content;
-    if let Some(c) = completed {
-        plot_item.completed = c;
-    }
-    
-    conn.execute(
-        "UPDATE plot_items SET content = ?1, completed = ?2 WHERE id = ?3",
-        params![plot_item.content, plot_item.completed as i32, plot_item.id],
+) -> Result<Vec<Plot>, String> {
+    let rows = sqlx::query_as::<_, (String, String, String, Option<String>, String, i32, i32, Option<String>, String, String)>(
+        "SELECT id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at FROM plots WHERE book_id = ? ORDER BY created_at"
     )
+    .bind(&book_id)
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
     .map_err(|e| e.to_string())?;
-    
-    Ok(plot_item)
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at)| Plot {
+            id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at,
+        })
+        .collect())
 }
 
-#[command]
-pub fn delete_plot_item(id: String) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM plot_items WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+#[tauri::command]
+pub async fn create_plot(
+    state: State<'_, AppState>,
+    data: CreatePlot,
+) -> Result<Plot, String> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let target_word_count = data.target_word_count.unwrap_or(3000);
+
+    sqlx::query(
+        "INSERT INTO plots (id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, 0, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&data.book_id)
+    .bind(&data.title)
+    .bind(&data.description)
+    .bind(target_word_count)
+    .bind(&data.chapter_id)
+    .bind(&now)
+    .bind(&now)
+    .execute(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Plot {
+        id,
+        book_id: data.book_id,
+        title: data.title,
+        description: data.description,
+        status: "active".to_string(),
+        target_word_count,
+        actual_word_count: 0,
+        chapter_id: data.chapter_id,
+        created_at: now.clone(),
+        updated_at: now,
+    })
 }
 
-#[command]
-pub fn reorder_plot_items(chapter_id: String, item_ids: Vec<String>) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    
-    for (index, item_id) in item_ids.iter().enumerate() {
-        conn.execute(
-            "UPDATE plot_items SET order_index = ?1 WHERE id = ?2 AND chapter_id = ?3",
-            params![index as i32, item_id, chapter_id],
-        )
-        .map_err(|e| e.to_string())?;
+#[tauri::command]
+pub async fn update_plot(
+    state: State<'_, AppState>,
+    id: String,
+    data: UpdatePlot,
+) -> Result<Plot, String> {
+    let now = Utc::now().to_rfc3339();
+    let mut updates = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<String> = vec![now];
+
+    macro_rules! add_update {
+        ($field:expr, $value:expr) => {
+            if let Some(ref v) = $value {
+                updates.push(concat!(stringify!($field), " = ?"));
+                params.push(v.clone());
+            }
+        };
     }
-    
-    Ok(())
+
+    add_update!(title, data.title);
+    add_update!(description, data.description);
+    add_update!(status, data.status);
+    add_update!(target_word_count, data.target_word_count);
+    add_update!(actual_word_count, data.actual_word_count);
+    add_update!(chapter_id, data.chapter_id);
+
+    let query = format!("UPDATE plots SET {} WHERE id = ?", updates.join(", "));
+    let mut q = sqlx::query(&query);
+    for p in &params {
+        q = q.bind(p);
+    }
+    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+
+    let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i32, i32, Option<String>, String, String)>(
+        "SELECT id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at FROM plots WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Plot {
+        id: row.0, book_id: row.1, title: row.2, description: row.3, status: row.4,
+        target_word_count: row.5, actual_word_count: row.6, chapter_id: row.7,
+        created_at: row.8, updated_at: row.9,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_plot(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM plots WHERE id = ?")
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_emotion(
+    state: State<'_, AppState>,
+    plot_id: String,
+    position: i32,
+    data: UpdateEmotion,
+) -> Result<EmotionMark, String> {
+    let now = Utc::now().to_rfc3339();
+
+    // 查找或创建情绪标记
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT id FROM emotion_marks WHERE plot_id = ? AND position = ?"
+    )
+    .bind(&plot_id)
+    .bind(position)
+    .fetch_optional(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some((id,)) = existing {
+        // 更新现有
+        sqlx::query("UPDATE emotion_marks SET expected_emotion = ?, actual_emotion = ? WHERE id = ?")
+            .bind(&data.expected_emotion.unwrap_or(3))
+            .bind(&data.actual_emotion.unwrap_or(3))
+            .bind(&id)
+            .execute(&*state.db.lock().unwrap())
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let row = sqlx::query_as::<_, (String, String, i32, i32, i32, i32, String)>(
+            "SELECT id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at FROM emotion_marks WHERE id = ?"
+        )
+        .bind(&id)
+        .fetch_one(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())?;
+
+        Ok(EmotionMark {
+            id: row.0, plot_id: row.1, emotion_level: row.2,
+            expected_emotion: row.3, actual_emotion: row.4, position: row.5, created_at: row.6,
+        })
+    } else {
+        // 创建新标记
+        let id = Uuid::new_v4().to_string();
+        let emotion_level = position;
+        let expected = data.expected_emotion.unwrap_or(3);
+        let actual = data.actual_emotion.unwrap_or(3);
+
+        sqlx::query(
+            "INSERT INTO emotion_marks (id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&id)
+        .bind(&plot_id)
+        .bind(emotion_level)
+        .bind(expected)
+        .bind(actual)
+        .bind(position)
+        .bind(&now)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())?;
+
+        Ok(EmotionMark {
+            id, plot_id, emotion_level, expected_emotion: expected, actual_emotion: actual,
+            position, created_at: now,
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn get_emotions(
+    state: State<'_, AppState>,
+    plot_id: String,
+) -> Result<Vec<EmotionMark>, String> {
+    let rows = sqlx::query_as::<_, (String, String, i32, i32, i32, i32, String)>(
+        "SELECT id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at FROM emotion_marks WHERE plot_id = ? ORDER BY position"
+    )
+    .bind(&plot_id)
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at)| EmotionMark {
+            id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at,
+        })
+        .collect())
 }

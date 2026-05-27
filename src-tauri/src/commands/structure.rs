@@ -1,362 +1,341 @@
-// 结构管理命令（伏笔+世界观）
-use crate::db::get_db_path;
-use crate::models::structure::{Foreshadow, Worldview};
-use rusqlite::{params, Connection};
-use tauri::command;
-use serde::{Deserialize, Serialize};
+// 伏笔和世界观相关命令 - 双向互锁 + 挂载
+use crate::models::*;
+use crate::AppState;
+use tauri::State;
+use uuid::Uuid;
+use chrono::Utc;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorldviewChapter {
-    pub worldview_id: String,
-    pub chapter_id: String,
-    pub position: String,
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StructureData {
+    pub foreshadows: Vec<Foreshadow>,
+    pub worldviews: Vec<Worldview>,
+    pub worldview_mounts: Vec<WorldviewMount>,
 }
 
-#[command]
-pub fn create_foreshadow(
+#[tauri::command]
+pub async fn get_structures(
+    state: State<'_, AppState>,
     book_id: String,
-    name: String,
-    bury_chapter_id: Option<String>,
-    bury_chapter_title: Option<String>,
-    bury_content: Option<String>,
-) -> Result<Foreshadow, String> {
-    let mut foreshadow = Foreshadow::new(book_id, name);
-    if let Some(bci) = bury_chapter_id {
-        foreshadow.bury_chapter_id = Some(bci);
-    }
-    if let Some(bct) = bury_chapter_title {
-        foreshadow.bury_chapter_title = Some(bct);
-    }
-    if let Some(bc) = bury_content {
-        foreshadow.bury_content = bc;
-    }
-    
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO foreshadows (id, book_id, name, bury_chapter_id, bury_chapter_title, bury_content, reveal_chapter_id, reveal_chapter_title, reveal_content, completed, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-        params![
-            foreshadow.id,
-            foreshadow.book_id,
-            foreshadow.name,
-            foreshadow.bury_chapter_id,
-            foreshadow.bury_chapter_title,
-            foreshadow.bury_content,
-            foreshadow.reveal_chapter_id,
-            foreshadow.reveal_chapter_title,
-            foreshadow.reveal_content,
-            foreshadow.completed as i32,
-            foreshadow.created_at,
-            foreshadow.updated_at
-        ],
-    ).map_err(|e| e.to_string())?;
-    
-    Ok(foreshadow)
-}
+) -> Result<StructureData, String> {
+    let foreshadows = get_foreshadows(state.clone(), book_id.clone()).await?;
+    let worldviews = get_worldviews(state.clone(), book_id.clone()).await?;
+    let worldview_mounts = get_worldview_mounts(state.clone()).await?;
 
-#[command]
-pub fn get_foreshadows(book_id: String) -> Result<Vec<Foreshadow>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, book_id, name, bury_chapter_id, bury_chapter_title, bury_content, reveal_chapter_id, reveal_chapter_title, reveal_content, completed, created_at, updated_at FROM foreshadows WHERE book_id = ?1 ORDER BY created_at")
-        .map_err(|e| e.to_string())?;
-    
-    let foreshadows = stmt
-        .query_map(params![book_id], |row| {
-            let completed: i32 = row.get(9)?;
-            Ok(Foreshadow {
-                id: row.get(0)?,
-                book_id: row.get(1)?,
-                name: row.get(2)?,
-                bury_chapter_id: row.get(3)?,
-                bury_chapter_title: row.get(4)?,
-                bury_content: row.get(5)?,
-                reveal_chapter_id: row.get(6)?,
-                reveal_chapter_title: row.get(7)?,
-                reveal_content: row.get(8)?,
-                completed: completed != 0,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(foreshadows)
-}
-
-#[command]
-pub fn update_foreshadow(
-    id: String,
-    name: Option<String>,
-    reveal_chapter_id: Option<String>,
-    reveal_chapter_title: Option<String>,
-    reveal_content: Option<String>,
-    completed: Option<bool>,
-) -> Result<Foreshadow, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().to_rfc3339();
-    
-    // 先获取现有伏笔
-    let mut stmt = conn
-        .prepare("SELECT id, book_id, name, bury_chapter_id, bury_chapter_title, bury_content, reveal_chapter_id, reveal_chapter_title, reveal_content, completed, created_at, updated_at FROM foreshadows WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let mut foreshadow: Foreshadow = stmt.query_row(params![id], |row| {
-        let completed_int: i32 = row.get(9)?;
-        Ok(Foreshadow {
-            id: row.get(0)?,
-            book_id: row.get(1)?,
-            name: row.get(2)?,
-            bury_chapter_id: row.get(3)?,
-            bury_chapter_title: row.get(4)?,
-            bury_content: row.get(5)?,
-            reveal_chapter_id: row.get(6)?,
-            reveal_chapter_title: row.get(7)?,
-            reveal_content: row.get(8)?,
-            completed: completed_int != 0,
-            created_at: row.get(10)?,
-            updated_at: row.get(11)?,
-        })
+    Ok(StructureData {
+        foreshadows,
+        worldviews,
+        worldview_mounts,
     })
-    .map_err(|e| e.to_string())?;
-    
-    // 更新字段
-    if let Some(n) = name {
-        foreshadow.name = n;
-    }
-    if let Some(rc) = reveal_chapter_id {
-        foreshadow.reveal_chapter_id = Some(rc);
-    }
-    if let Some(rt) = reveal_chapter_title {
-        foreshadow.reveal_chapter_title = Some(rt);
-    }
-    if let Some(rc) = reveal_content {
-        foreshadow.reveal_content = rc;
-    }
-    if let Some(c) = completed {
-        foreshadow.completed = c;
-    }
-    foreshadow.updated_at = now;
-    
-    conn.execute(
-        "UPDATE foreshadows SET name = ?1, reveal_chapter_id = ?2, reveal_chapter_title = ?3, reveal_content = ?4, completed = ?5, updated_at = ?6 WHERE id = ?7",
-        params![
-            foreshadow.name,
-            foreshadow.reveal_chapter_id,
-            foreshadow.reveal_chapter_title,
-            foreshadow.reveal_content,
-            foreshadow.completed as i32,
-            foreshadow.updated_at,
-            foreshadow.id
-        ],
-    )
-    .map_err(|e| e.to_string())?;
-    
-    Ok(foreshadow)
 }
 
-#[command]
-pub fn delete_foreshadow(id: String) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM foreshadows WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-// 世界观管理命令
-#[command]
-pub fn create_worldview(
+async fn get_foreshadows(
+    state: State<'_, AppState>,
     book_id: String,
-    name: String,
-    description: Option<String>,
-) -> Result<Worldview, String> {
-    let mut worldview = Worldview::new(book_id, name);
-    if let Some(d) = description {
-        worldview.description = d;
-    }
-    
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO worldviews (id, book_id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![
-            worldview.id,
-            worldview.book_id,
-            worldview.name,
-            worldview.description,
-            worldview.created_at,
-            worldview.updated_at
-        ],
-    ).map_err(|e| e.to_string())?;
-    
-    Ok(worldview)
+) -> Result<Vec<Foreshadow>, String> {
+    let rows = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, String, String, String)>(
+        "SELECT id, book_id, title, description, buried_chapter_id, resolved_chapter_id, status, created_at, updated_at FROM foreshadows WHERE book_id = ? ORDER BY created_at"
+    )
+    .bind(&book_id)
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, book_id, title, description, buried_chapter_id, resolved_chapter_id, status, created_at, updated_at)| Foreshadow {
+            id, book_id, title, description, buried_chapter_id, resolved_chapter_id, status, created_at, updated_at,
+        })
+        .collect())
 }
 
-#[command]
-pub fn get_worldviews(book_id: String) -> Result<Vec<Worldview>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, book_id, name, description, created_at, updated_at FROM worldviews WHERE book_id = ?1 ORDER BY created_at")
-        .map_err(|e| e.to_string())?;
-    
-    let worldviews = stmt
-        .query_map(params![book_id], |row| {
-            Ok(Worldview {
-                id: row.get(0)?,
-                book_id: row.get(1)?,
-                name: row.get(2)?,
-                description: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(worldviews)
-}
+#[tauri::command]
+pub async fn create_foreshadow(
+    state: State<'_, AppState>,
+    data: CreateForeshadow,
+) -> Result<Foreshadow, String> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
 
-#[command]
-pub fn get_worldview(id: String) -> Result<Worldview, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, book_id, name, description, created_at, updated_at FROM worldviews WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    stmt.query_row(params![id], |row| {
-        Ok(Worldview {
-            id: row.get(0)?,
-            book_id: row.get(1)?,
-            name: row.get(2)?,
-            description: row.get(3)?,
-            created_at: row.get(4)?,
-            updated_at: row.get(5)?,
-        })
+    sqlx::query(
+        "INSERT INTO foreshadows (id, book_id, title, description, buried_chapter_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)"
+    )
+    .bind(&id)
+    .bind(&data.book_id)
+    .bind(&data.title)
+    .bind(&data.description)
+    .bind(&data.buried_chapter_id)
+    .bind(&now)
+    .bind(&now)
+    .execute(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Foreshadow {
+        id,
+        book_id: data.book_id,
+        title: data.title,
+        description: data.description,
+        buried_chapter_id: data.buried_chapter_id,
+        resolved_chapter_id: None,
+        status: "active".to_string(),
+        created_at: now.clone(),
+        updated_at: now,
     })
-    .map_err(|e| e.to_string())
 }
 
-#[command]
-pub fn update_worldview(
+#[tauri::command]
+pub async fn update_foreshadow(
+    state: State<'_, AppState>,
     id: String,
-    name: Option<String>,
-    description: Option<String>,
-) -> Result<Worldview, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().to_rfc3339();
-    
-    // 先获取现有世界观
-    let mut stmt = conn
-        .prepare("SELECT id, book_id, name, description, created_at, updated_at FROM worldviews WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let mut worldview: Worldview = stmt.query_row(params![id], |row| {
-        Ok(Worldview {
-            id: row.get(0)?,
-            book_id: row.get(1)?,
-            name: row.get(2)?,
-            description: row.get(3)?,
-            created_at: row.get(4)?,
-            updated_at: row.get(5)?,
-        })
+    data: UpdateForeshadow,
+) -> Result<Foreshadow, String> {
+    let now = Utc::now().to_rfc3339();
+    let mut updates = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<String> = vec![now];
+
+    macro_rules! add_update {
+        ($field:expr, $value:expr) => {
+            if let Some(ref v) = $value {
+                updates.push(concat!(stringify!($field), " = ?"));
+                params.push(v.clone());
+            }
+        };
+    }
+
+    add_update!(title, data.title);
+    add_update!(description, data.description);
+    add_update!(buried_chapter_id, data.buried_chapter_id);
+    add_update!(resolved_chapter_id, data.resolved_chapter_id);
+    add_update!(status, data.status);
+
+    let query = format!("UPDATE foreshadows SET {} WHERE id = ?", updates.join(", "));
+    let mut q = sqlx::query(&query);
+    for p in &params {
+        q = q.bind(p);
+    }
+    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+
+    let row = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, String, String, String)>(
+        "SELECT id, book_id, title, description, buried_chapter_id, resolved_chapter_id, status, created_at, updated_at FROM foreshadows WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Foreshadow {
+        id: row.0, book_id: row.1, title: row.2, description: row.3,
+        buried_chapter_id: row.4, resolved_chapter_id: row.5, status: row.6,
+        created_at: row.7, updated_at: row.8,
     })
-    .map_err(|e| e.to_string())?;
-    
-    // 更新字段
-    if let Some(n) = name {
-        worldview.name = n;
-    }
-    if let Some(d) = description {
-        worldview.description = d;
-    }
-    worldview.updated_at = now;
-    
-    conn.execute(
-        "UPDATE worldviews SET name = ?1, description = ?2, updated_at = ?3 WHERE id = ?4",
-        params![worldview.name, worldview.description, worldview.updated_at, worldview.id],
+}
+
+#[tauri::command]
+pub async fn delete_foreshadow(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM foreshadows WHERE id = ?")
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 解决伏笔 - 双向互锁：同时设置 resolved_chapter_id
+#[tauri::command]
+pub async fn resolve_foreshadow(
+    state: State<'_, AppState>,
+    id: String,
+    resolved_chapter_id: String,
+) -> Result<Foreshadow, String> {
+    let now = Utc::now().to_rfc3339();
+
+    sqlx::query("UPDATE foreshadows SET resolved_chapter_id = ?, status = 'resolved', updated_at = ? WHERE id = ?")
+        .bind(&resolved_chapter_id)
+        .bind(&now)
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let row = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, String, String, String)>(
+        "SELECT id, book_id, title, description, buried_chapter_id, resolved_chapter_id, status, created_at, updated_at FROM foreshadows WHERE id = ?"
     )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
     .map_err(|e| e.to_string())?;
-    
-    Ok(worldview)
+
+    Ok(Foreshadow {
+        id: row.0, book_id: row.1, title: row.2, description: row.3,
+        buried_chapter_id: row.4, resolved_chapter_id: row.5, status: row.6,
+        created_at: row.7, updated_at: row.8,
+    })
 }
 
-#[command]
-pub fn delete_worldview(id: String) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM worldviews WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-// 世界观-章节关联
-#[command]
-pub fn attach_worldview_to_chapter(worldview_id: String, chapter_id: String, position: Option<String>) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let pos = position.unwrap_or_default();
-    
-    conn.execute(
-        "INSERT OR REPLACE INTO worldview_chapters (worldview_id, chapter_id, position) VALUES (?1, ?2, ?3)",
-        params![worldview_id, chapter_id, pos],
-    ).map_err(|e| e.to_string())?;
-    
-    Ok(())
-}
-
-#[command]
-pub fn detach_worldview_from_chapter(worldview_id: String, chapter_id: String) -> Result<(), String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    conn.execute(
-        "DELETE FROM worldview_chapters WHERE worldview_id = ?1 AND chapter_id = ?2",
-        params![worldview_id, chapter_id],
+async fn get_worldviews(
+    state: State<'_, AppState>,
+    book_id: String,
+) -> Result<Vec<Worldview>, String> {
+    let rows = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, String, String)>(
+        "SELECT id, book_id, title, content, category, created_at, updated_at FROM worldviews WHERE book_id = ? ORDER BY category, title"
     )
+    .bind(&book_id)
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
     .map_err(|e| e.to_string())?;
-    Ok(())
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, book_id, title, content, category, created_at, updated_at)| Worldview {
+            id, book_id, title, content, category, created_at, updated_at,
+        })
+        .collect())
 }
 
-#[command]
-pub fn get_worldview_chapters(worldview_id: String) -> Result<Vec<WorldviewChapter>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT worldview_id, chapter_id, position FROM worldview_chapters WHERE worldview_id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let chapters = stmt
-        .query_map(params![worldview_id], |row| {
-            Ok(WorldviewChapter {
-                worldview_id: row.get(0)?,
-                chapter_id: row.get(1)?,
-                position: row.get(2)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(chapters)
+#[tauri::command]
+pub async fn create_worldview(
+    state: State<'_, AppState>,
+    data: CreateWorldview,
+) -> Result<Worldview, String> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    sqlx::query(
+        "INSERT INTO worldviews (id, book_id, title, content, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&data.book_id)
+    .bind(&data.title)
+    .bind(&data.content)
+    .bind(&data.category)
+    .bind(&now)
+    .bind(&now)
+    .execute(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Worldview {
+        id,
+        book_id: data.book_id,
+        title: data.title,
+        content: data.content,
+        category: data.category,
+        created_at: now.clone(),
+        updated_at: now,
+    })
 }
 
-#[command]
-pub fn get_chapter_worldviews(chapter_id: String) -> Result<Vec<Worldview>, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT w.id, w.book_id, w.name, w.description, w.created_at, w.updated_at FROM worldviews w INNER JOIN worldview_chapters wc ON w.id = wc.worldview_id WHERE wc.chapter_id = ?1 ORDER BY w.created_at")
-        .map_err(|e| e.to_string())?;
-    
-    let worldviews = stmt
-        .query_map(params![chapter_id], |row| {
-            Ok(Worldview {
-                id: row.get(0)?,
-                book_id: row.get(1)?,
-                name: row.get(2)?,
-                description: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-            })
+#[tauri::command]
+pub async fn update_worldview(
+    state: State<'_, AppState>,
+    id: String,
+    data: UpdateWorldview,
+) -> Result<Worldview, String> {
+    let now = Utc::now().to_rfc3339();
+    let mut updates = vec!["updated_at = ?".to_string()];
+    let mut params: Vec<String> = vec![now];
+
+    macro_rules! add_update {
+        ($field:expr, $value:expr) => {
+            if let Some(ref v) = $value {
+                updates.push(concat!(stringify!($field), " = ?"));
+                params.push(v.clone());
+            }
+        };
+    }
+
+    add_update!(title, data.title);
+    add_update!(content, data.content);
+    add_update!(category, data.category);
+
+    let query = format!("UPDATE worldviews SET {} WHERE id = ?", updates.join(", "));
+    let mut q = sqlx::query(&query);
+    for p in &params {
+        q = q.bind(p);
+    }
+    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+
+    let row = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, String, String)>(
+        "SELECT id, book_id, title, content, category, created_at, updated_at FROM worldviews WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Worldview {
+        id: row.0, book_id: row.1, title: row.2, content: row.3,
+        category: row.4, created_at: row.5, updated_at: row.6,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_worldview(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM worldviews WHERE id = ?")
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn get_worldview_mounts(
+    state: State<'_, AppState>,
+) -> Result<Vec<WorldviewMount>, String> {
+    let rows = sqlx::query_as::<_, (String, String, String, String)>(
+        "SELECT id, worldview_id, chapter_id, created_at FROM worldview_mounts"
+    )
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, worldview_id, chapter_id, created_at)| WorldviewMount {
+            id, worldview_id, chapter_id, created_at,
         })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    
-    Ok(worldviews)
+        .collect())
+}
+
+#[tauri::command]
+pub async fn mount_worldview(
+    state: State<'_, AppState>,
+    data: MountWorldview,
+) -> Result<WorldviewMount, String> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    sqlx::query(
+        "INSERT INTO worldview_mounts (id, worldview_id, chapter_id, created_at) VALUES (?, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&data.worldview_id)
+    .bind(&data.chapter_id)
+    .bind(&now)
+    .execute(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(WorldviewMount {
+        id,
+        worldview_id: data.worldview_id,
+        chapter_id: data.chapter_id,
+        created_at: now,
+    })
+}
+
+#[tauri::command]
+pub async fn unmount_worldview(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM worldview_mounts WHERE id = ?")
+        .bind(&id)
+        .execute(&*state.db.lock().unwrap())
+        .await
+        .map_err(|e| e.to_string())
 }

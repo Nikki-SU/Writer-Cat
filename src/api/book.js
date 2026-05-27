@@ -1,47 +1,22 @@
-// 书籍API封装
+// 书籍 API
 import { invoke } from '@tauri-apps/api/core';
 
-/**
- * 创建新书籍
- * @param {string} name - 书籍名称
- * @returns {Promise<Book>}
- */
-export async function createBook(name) {
-  return await invoke('create_book', { name });
-}
-
-/**
- * 获取所有书籍
- * @returns {Promise<Book[]>}
- */
-export async function getBooks() {
-  return await invoke('get_books');
-}
-
-/**
- * 获取单个书籍
- * @param {string} id - 书籍ID
- * @returns {Promise<Book>}
- */
-export async function getBook(id) {
-  return await invoke('get_book', { id });
-}
-
-/**
- * 更新书籍信息
- * @param {string} id - 书籍ID
- * @param {string} name - 书籍名称
- * @returns {Promise<Book>}
- */
-export async function updateBook(id, name) {
-  return await invoke('update_book', { id, name });
-}
-
-/**
- * 删除书籍
- * @param {string} id - 书籍ID
- * @returns {Promise<void>}
- */
-export async function deleteBook(id) {
-  return await invoke('delete_book', { id });
-}
+export const bookApi = {
+  // 获取所有书籍
+  getBooks: () => invoke('get_books'),
+  
+  // 获取单个书籍
+  getBook: (id) => invoke('get_book', { id }),
+  
+  // 创建书籍
+  createBook: (data) => invoke('create_book', { data }),
+  
+  // 更新书籍
+  updateBook: (id, data) => invoke('update_book', { id, data }),
+  
+  // 删除书籍
+  deleteBook: (id) => invoke('delete_book', { id }),
+  
+  // 获取数据路径
+  getDataPath: () => invoke('get_data_path'),
+};
