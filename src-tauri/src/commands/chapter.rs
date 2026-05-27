@@ -1,4 +1,4 @@
-// fix: 章节相关命令 - CRUD + 排序 + 文件读写 + 自动保存 + 导出
+// 章节相关命令 - CRUD + 排序 + 文件读写 + 自动保存 + 导出
 use crate::commands::book::get_data_dir;
 use crate::models::{Backup, Chapter, ChapterOrder, CreateChapter, ReorderChapters, UpdateChapter};
 use crate::AppState;
@@ -22,7 +22,7 @@ fn get_backup_dir(book_id: &str, chapter_id: &str) -> std::path::PathBuf {
         .join(chapter_id)
 }
 
-// 辅助函数：获取章节信息
+/// 辅助函数：获取章节信息
 pub async fn get_chapter_by_id(
     state: State<'_, AppState>,
     id: String,
@@ -31,19 +31,13 @@ pub async fn get_chapter_by_id(
         "SELECT id, book_id, title, order_index, word_count, status, created_at, updated_at FROM chapters WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(Chapter {
-        id: row.0,
-        book_id: row.1,
-        title: row.2,
-        order_index: row.3,
-        word_count: row.4,
-        status: row.5,
-        created_at: row.6,
-        updated_at: row.7,
+        id: row.0, book_id: row.1, title: row.2, order_index: row.3,
+        word_count: row.4, status: row.5, created_at: row.6, updated_at: row.7,
     })
 }
 
@@ -55,15 +49,14 @@ pub async fn create_chapter(
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    // 获取当前最大 order_index
     let max_order: Option<i32> = sqlx::query_scalar(
         "SELECT MAX(order_index) FROM chapters WHERE book_id = ?"
     )
     .bind(&data.book_id)
-    .fetch_optional(&*state.db.lock().unwrap())
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     let order_index = max_order.unwrap_or(-1) + 1;
 
     sqlx::query(
@@ -75,7 +68,7 @@ pub async fn create_chapter(
     .bind(order_index)
     .bind(&now)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -84,14 +77,8 @@ pub async fn create_chapter(
     fs::write(&chapter_path, "").map_err(|e| e.to_string())?;
 
     Ok(Chapter {
-        id,
-        book_id: data.book_id,
-        title: data.title,
-        order_index,
-        word_count: 0,
-        status: "draft".to_string(),
-        created_at: now.clone(),
-        updated_at: now,
+        id, book_id: data.book_id, title: data.title, order_index,
+        word_count: 0, status: "draft".to_string(), created_at: now.clone(), updated_at: now,
     })
 }
 
@@ -104,7 +91,7 @@ pub async fn get_chapters(
         "SELECT id, book_id, title, order_index, word_count, status, created_at, updated_at FROM chapters WHERE book_id = ? ORDER BY order_index"
     )
     .bind(&book_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -148,7 +135,7 @@ pub async fn update_chapter(
     for p in &params {
         q = q.bind(p);
     }
-    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+    q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
 
     get_chapter_by_id(state, id).await
 }
@@ -162,7 +149,7 @@ pub async fn delete_chapter(
 
     sqlx::query("DELETE FROM chapters WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -187,14 +174,14 @@ pub async fn reorder_chapters(
     data: ReorderChapters,
 ) -> Result<(), String> {
     let now = Utc::now().to_rfc3339();
-    
+
     for order in data.chapter_orders {
         sqlx::query("UPDATE chapters SET order_index = ?, updated_at = ? WHERE id = ? AND book_id = ?")
             .bind(order.order_index)
             .bind(&now)
             .bind(&order.id)
             .bind(&data.book_id)
-            .execute(&*state.db.lock().unwrap())
+            .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -209,7 +196,6 @@ pub async fn read_chapter_content(
 ) -> Result<String, String> {
     let chapter = get_chapter_by_id(state, id).await?;
     let path = get_chapter_path(&chapter.book_id, &chapter.id);
-    
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
@@ -221,16 +207,15 @@ pub async fn write_chapter_content(
 ) -> Result<i32, String> {
     let chapter = get_chapter_by_id(state.clone(), id.clone()).await?;
     let path = get_chapter_path(&chapter.book_id, &chapter.id);
-    
-    // 计算字数
+
     let word_count = content.chars().filter(|c| !c.is_whitespace()).count() as i32;
 
-    // 自动保存：先写 .tmp 再替换
+    // 安全写入：先写 .tmp 再替换
     let tmp_path = path.with_extension("tmp");
     fs::write(&tmp_path, &content).map_err(|e| e.to_string())?;
     fs::rename(&tmp_path, &path).map_err(|e| e.to_string())?;
 
-    // 创建备份（保留最近10个）
+    // 创建备份
     create_backup(&chapter.book_id, &chapter.id, &content).await?;
 
     // 更新字数
@@ -239,7 +224,7 @@ pub async fn write_chapter_content(
         .bind(word_count)
         .bind(&now)
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -260,10 +245,10 @@ async fn create_backup(book_id: &str, chapter_id: &str, content: &str) -> Result
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         .collect();
-    
+
     backups.sort_by_key(|e| e.path());
     backups.reverse();
-    
+
     for backup in backups.into_iter().skip(10) {
         fs::remove_file(backup.path()).ok();
     }
@@ -286,9 +271,7 @@ pub async fn get_backups(
     let entries = fs::read_dir(&backup_dir).map_err(|e| e.to_string())?;
     let mut backups: Vec<Backup> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().map_or(false, |ext| ext == "md")
-        })
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         .filter_map(|e| {
             let metadata = e.metadata().ok()?;
             let name = e.file_name().to_string_lossy().to_string();
@@ -340,7 +323,6 @@ pub async fn export_book(
     let chapters = get_chapters(state.clone(), book_id.clone()).await?;
     let data_path = get_data_dir();
 
-    // 创建 zip
     let zip_path = data_path.join("sync").join(format!("{}.zip", book_id));
     fs::create_dir_all(zip_path.parent().unwrap()).map_err(|e| e.to_string())?;
 
@@ -348,11 +330,9 @@ pub async fn export_book(
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    // 添加元数据
     zip.start_file("meta.json", options.clone()).map_err(|e| e.to_string())?;
     zip.write_all(serde_json::to_string_pretty(&book).unwrap().as_bytes()).map_err(|e| e.to_string())?;
 
-    // 添加章节
     for chapter in &chapters {
         let chapter_path = get_chapter_path(&book_id, &chapter.id);
         if chapter_path.exists() {
@@ -363,7 +343,6 @@ pub async fn export_book(
         }
     }
 
-    // 添加 assets
     let assets_dir = data_path.join("books").join(&book_id).join("assets");
     if assets_dir.exists() {
         for entry in walkdir::WalkDir::new(&assets_dir) {
@@ -379,6 +358,5 @@ pub async fn export_book(
     }
 
     zip.finish().map_err(|e| e.to_string())?;
-
     Ok(zip_path.to_string_lossy().to_string())
 }

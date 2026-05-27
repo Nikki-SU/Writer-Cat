@@ -1,5 +1,4 @@
-// fix: AI 检查和提取命令
-use crate::commands::ollama::OllamaStatus;
+// AI 检查和提取命令
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -58,12 +57,11 @@ pub async fn check_text(
     book_id: String,
 ) -> Result<TextCheckResult, String> {
     let status = crate::commands::ollama::check_ollama_status().await?;
-    
+
     if !status.installed || !status.running {
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
 
-    // 调用 Ollama 进行检查
     let client = reqwest::Client::new();
     let prompt = format!(
         r#"你是一个专业的网文写作助手。请检查以下文本中的问题：
@@ -89,9 +87,7 @@ pub async fn check_text(
             "model": "qwen2.5:7b",
             "prompt": prompt,
             "stream": false,
-            "options": {
-                "temperature": 0.1
-            }
+            "options": { "temperature": 0.1 }
         }))
         .timeout(std::time::Duration::from_secs(30))
         .send()
@@ -103,7 +99,6 @@ pub async fn check_text(
         .and_then(|r| r.as_str())
         .unwrap_or("{}");
 
-    // 尝试解析 JSON
     serde_json::from_str(response).map_err(|e| e.to_string())
 }
 
@@ -113,7 +108,7 @@ pub async fn extract_entities(
     book_id: String,
 ) -> Result<ExtractResult, String> {
     let status = crate::commands::ollama::check_ollama_status().await?;
-    
+
     if !status.installed || !status.running {
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
@@ -145,9 +140,7 @@ pub async fn extract_entities(
             "model": "qwen2.5:7b",
             "prompt": prompt,
             "stream": false,
-            "options": {
-                "temperature": 0.3
-            }
+            "options": { "temperature": 0.3 }
         }))
         .timeout(std::time::Duration::from_secs(30))
         .send()
@@ -168,7 +161,7 @@ pub async fn generate_text(
     context: Option<String>,
 ) -> Result<String, String> {
     let status = crate::commands::ollama::check_ollama_status().await?;
-    
+
     if !status.installed || !status.running {
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
@@ -185,10 +178,7 @@ pub async fn generate_text(
             "model": "qwen2.5:7b",
             "prompt": full_prompt,
             "stream": false,
-            "options": {
-                "temperature": 0.7,
-                "num_predict": 500
-            }
+            "options": { "temperature": 0.7, "num_predict": 500 }
         }))
         .timeout(std::time::Duration::from_secs(60))
         .send()

@@ -1,4 +1,4 @@
-// fix: 设置相关命令
+// 设置相关命令
 use crate::commands::book::get_data_dir;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String
     let row: Option<(String,)> = sqlx::query_as(
         "SELECT value FROM settings WHERE key = 'global'"
     )
-    .fetch_optional(&*state.db.lock().unwrap())
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -64,7 +64,7 @@ pub async fn update_settings(
 
     sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('global', ?)")
         .bind(&value)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -83,7 +83,6 @@ pub async fn export_data(
     let export_path = data_path.join("export").join("data_export.json");
     fs::create_dir_all(export_path.parent().unwrap()).map_err(|e| e.to_string())?;
 
-    // 这里简化处理，实际应该导出完整数据
     let export_data = serde_json::json!({
         "version": "2.0.0",
         "exported_at": chrono::Utc::now().to_rfc3339(),
@@ -107,7 +106,6 @@ pub async fn export_data(
 pub async fn import_data(
     import_path: String,
 ) -> Result<(), String> {
-    // 简化处理，实际应该解析 zip 并导入数据
     let content = fs::read_to_string(&import_path).map_err(|e| e.to_string())?;
     let _data: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
     Ok(())

@@ -1,4 +1,4 @@
-// fix: Ollama 检测和安装命令
+// Ollama 检测和安装命令
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,7 +18,6 @@ pub struct OllamaModel {
 
 #[tauri::command]
 pub async fn check_ollama_status() -> Result<OllamaStatus, String> {
-    // 检测 Ollama 是否运行
     let client = reqwest::Client::new();
     let result = client
         .get("http://localhost:11434/api/version")
@@ -31,31 +30,22 @@ pub async fn check_ollama_status() -> Result<OllamaStatus, String> {
             let version = resp.json::<serde_json::Value>().await.ok()
                 .and_then(|v| v.get("version").cloned())
                 .and_then(|v| v.as_str().map(String::from));
-            
+
             let models = get_models_from_ollama().await.unwrap_or_default();
-            
-            Ok(OllamaStatus {
-                installed: true,
-                running: true,
-                version,
-                models,
-            })
+
+            Ok(OllamaStatus { installed: true, running: true, version, models })
         }
         _ => {
-            // 检查是否安装但未运行
-            let installed = which_ollama();
-            Ok(OllamaStatus {
-                installed,
-                running: false,
-                version: None,
-                models: vec![],
-            })
+            let installed = is_ollama_installed();
+            Ok(OllamaStatus { installed, running: false, version: None, models: vec![] })
         }
     }
 }
 
-fn which_ollama() -> bool {
-    std::process::Command::new("which")
+/// 跨平台检测 Ollama 是否安装
+fn is_ollama_installed() -> bool {
+    let cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    std::process::Command::new(cmd)
         .arg("ollama")
         .output()
         .map(|o| o.status.success())
@@ -90,16 +80,15 @@ async fn get_models_from_ollama() -> Result<Vec<OllamaModel>, String> {
 
 #[tauri::command]
 pub async fn install_ollama() -> Result<String, String> {
-    // 返回安装指引
     #[cfg(target_os = "macos")]
     return Ok("请访问 https://ollama.com/download 下载并安装 Ollama".to_string());
-    
+
     #[cfg(target_os = "linux")]
     return Ok("运行: curl -fsSL https://ollama.com/install.sh | sh".to_string());
-    
+
     #[cfg(target_os = "windows")]
     return Ok("请访问 https://ollama.com/download 下载 Windows 版本".to_string());
-    
+
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     return Ok("请访问 https://ollama.com/download 下载适合您系统的版本".to_string());
 }
@@ -107,13 +96,12 @@ pub async fn install_ollama() -> Result<String, String> {
 #[tauri::command]
 pub async fn pull_model(model: String) -> Result<String, String> {
     let client = reqwest::Client::new();
-    // 启动模型拉取
     client.post("http://localhost:11434/api/pull")
         .json(&serde_json::json!({ "name": model }))
         .send()
         .await
         .map_err(|e| e.to_string())?;
-    
+
     Ok(format!("开始下载模型: {}", model))
 }
 

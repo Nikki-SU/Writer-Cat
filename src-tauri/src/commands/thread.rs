@@ -1,4 +1,4 @@
-// fix: 线索和长伏笔相关命令 - 线性/分支/收束链式结构
+// 线索和长伏笔相关命令 - 线性/分支/收束链式结构
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -21,17 +21,15 @@ pub async fn get_threads(
         "SELECT id, book_id, title, thread_type, status, created_at, updated_at FROM threads WHERE book_id = ? ORDER BY created_at"
     )
     .bind(&book_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     let mut result = vec![];
     for (id, book_id, title, thread_type, status, created_at, updated_at) in rows {
-        let nodes = get_thread_nodes(state.clone(), id.clone()).await?;
+        let nodes = get_thread_nodes_inner(&state.db, &id).await?;
         result.push(ThreadWithNodes {
-            thread: Thread {
-                id, book_id, title, thread_type, status, created_at, updated_at,
-            },
+            thread: Thread { id, book_id, title, thread_type, status, created_at, updated_at },
             nodes,
         });
     }
@@ -39,15 +37,15 @@ pub async fn get_threads(
     Ok(result)
 }
 
-async fn get_thread_nodes(
-    state: State<'_, AppState>,
-    thread_id: String,
+async fn get_thread_nodes_inner(
+    pool: &sqlx::SqlitePool,
+    thread_id: &str,
 ) -> Result<Vec<ThreadNode>, String> {
     let rows = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, String, i32, String, String)>(
         "SELECT id, thread_id, title, content, chapter_id, parent_node_id, node_type, order_index, created_at, updated_at FROM thread_nodes WHERE thread_id = ? ORDER BY order_index"
     )
-    .bind(&thread_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .bind(thread_id)
+    .fetch_all(pool)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -77,18 +75,13 @@ pub async fn create_thread(
     .bind(&thread_type)
     .bind(&now)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(Thread {
-        id,
-        book_id: data.book_id,
-        title: data.title,
-        thread_type,
-        status: "active".to_string(),
-        created_at: now.clone(),
-        updated_at: now,
+        id, book_id: data.book_id, title: data.title, thread_type,
+        status: "active".to_string(), created_at: now.clone(), updated_at: now,
     })
 }
 
@@ -102,31 +95,22 @@ pub async fn update_thread(
     let mut updates = vec!["updated_at = ?".to_string()];
     let mut params: Vec<String> = vec![now];
 
-    macro_rules! add_update {
-        ($field:expr, $value:expr) => {
-            if let Some(ref v) = $value {
-                updates.push(concat!(stringify!($field), " = ?"));
-                params.push(v.clone());
-            }
-        };
-    }
-
-    add_update!(title, data.title);
-    add_update!(thread_type, data.thread_type);
-    add_update!(status, data.status);
+    if let Some(ref v) = data.title { updates.push("title = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.thread_type { updates.push("thread_type = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.status { updates.push("status = ?".to_string()); params.push(v.clone()); }
 
     let query = format!("UPDATE threads SET {} WHERE id = ?", updates.join(", "));
     let mut q = sqlx::query(&query);
     for p in &params {
         q = q.bind(p);
     }
-    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+    q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
 
     let row = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
         "SELECT id, book_id, title, thread_type, status, created_at, updated_at FROM threads WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -143,7 +127,7 @@ pub async fn delete_thread(
 ) -> Result<(), String> {
     sqlx::query("DELETE FROM threads WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -162,10 +146,10 @@ pub async fn add_thread_node(
         "SELECT MAX(order_index) FROM thread_nodes WHERE thread_id = ?"
     )
     .bind(&data.thread_id)
-    .fetch_optional(&*state.db.lock().unwrap())
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     let order_index = max_order.unwrap_or(-1) + 1;
 
     sqlx::query(
@@ -181,21 +165,14 @@ pub async fn add_thread_node(
     .bind(order_index)
     .bind(&now)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(ThreadNode {
-        id,
-        thread_id: data.thread_id,
-        title: data.title,
-        content: data.content,
-        chapter_id: data.chapter_id,
-        parent_node_id: data.parent_node_id,
-        node_type,
-        order_index,
-        created_at: now.clone(),
-        updated_at: now,
+        id, thread_id: data.thread_id, title: data.title, content: data.content,
+        chapter_id: data.chapter_id, parent_node_id: data.parent_node_id,
+        node_type, order_index, created_at: now.clone(), updated_at: now,
     })
 }
 
@@ -206,8 +183,6 @@ pub async fn update_thread_node(
     data: UpdateThreadNode,
 ) -> Result<ThreadNode, String> {
     let now = Utc::now().to_rfc3339();
-
-    // 逐字段拼接 SQL，i32 字段转为字符串绑定
     let mut set_clauses = vec!["updated_at = ?".to_string()];
     let mut str_params: Vec<String> = vec![now];
 
@@ -223,13 +198,13 @@ pub async fn update_thread_node(
     for p in &str_params {
         q = q.bind(p);
     }
-    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+    q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
 
     let row = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, String, i32, String, String)>(
         "SELECT id, thread_id, title, content, chapter_id, parent_node_id, node_type, order_index, created_at, updated_at FROM thread_nodes WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -244,10 +219,9 @@ pub async fn delete_thread_node(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<(), String> {
-    // 删除节点会级联删除子节点
     sqlx::query("DELETE FROM thread_nodes WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())

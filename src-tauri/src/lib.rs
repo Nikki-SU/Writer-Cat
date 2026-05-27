@@ -3,15 +3,14 @@ mod commands;
 mod db;
 mod models;
 
-use std::sync::Mutex;
 use tauri::Manager;
 
+/// 应用状态 - SqlitePool 本身是 Clone + Send + Sync，无需 Mutex
 pub struct AppState {
-    pub db: Mutex<sqlx::SqlitePool>,
+    pub db: sqlx::SqlitePool,
 }
 
 pub fn run() {
-    // 初始化数据库连接池
     let db_path = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("writer-cat")
@@ -28,21 +27,22 @@ pub fn run() {
         .unwrap()
         .block_on(async {
             sqlx::sqlite::SqlitePoolOptions::new()
-                .max_connections(1)
+                .max_connections(5)
                 .connect(&db_url)
                 .await
                 .expect("数据库连接失败")
         });
 
     // 初始化数据库表
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        db::init_db(&pool).expect("数据库初始化失败");
-    });
+    tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(async {
+            db::init_db(&pool).await.expect("数据库初始化失败");
+        });
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(AppState { db: Mutex::new(pool) })
+        .manage(AppState { db: pool })
         .invoke_handler(tauri::generate_handler![
             // 书籍相关
             commands::book::create_book,

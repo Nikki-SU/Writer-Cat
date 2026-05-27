@@ -1,4 +1,4 @@
-// fix: 人物相关命令 - CRUD + 关系 + 时间线
+// 人物相关命令 - CRUD + 关系 + 时间线
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -14,7 +14,7 @@ pub async fn get_characters(
         "SELECT id, book_id, name, nickname, gender, age, appearance, personality, background, created_at, updated_at FROM characters WHERE book_id = ? ORDER BY name"
     )
     .bind(&book_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -48,22 +48,15 @@ pub async fn create_character(
     .bind(&data.background)
     .bind(&now)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(Character {
-        id,
-        book_id: data.book_id,
-        name: data.name,
-        nickname: data.nickname,
-        gender: data.gender,
-        age: data.age,
-        appearance: data.appearance,
-        personality: data.personality,
-        background: data.background,
-        created_at: now.clone(),
-        updated_at: now,
+        id, book_id: data.book_id, name: data.name, nickname: data.nickname,
+        gender: data.gender, age: data.age, appearance: data.appearance,
+        personality: data.personality, background: data.background,
+        created_at: now.clone(), updated_at: now,
     })
 }
 
@@ -77,36 +70,27 @@ pub async fn update_character(
     let mut updates = vec!["updated_at = ?".to_string()];
     let mut params: Vec<String> = vec![now];
 
-    macro_rules! add_update {
-        ($field:expr, $value:expr) => {
-            if let Some(ref v) = $value {
-                updates.push(concat!(stringify!($field), " = ?"));
-                params.push(v.clone());
-            }
-        };
-    }
-
-    add_update!(name, data.name);
-    add_update!(nickname, data.nickname);
-    add_update!(gender, data.gender);
-    add_update!(age, data.age);
-    add_update!(appearance, data.appearance);
-    add_update!(personality, data.personality);
-    add_update!(background, data.background);
+    // 逐字段拼接，避免宏导致的类型问题
+    if let Some(ref v) = data.name { updates.push("name = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.nickname { updates.push("nickname = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.gender { updates.push("gender = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.age { updates.push("age = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.appearance { updates.push("appearance = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.personality { updates.push("personality = ?".to_string()); params.push(v.clone()); }
+    if let Some(ref v) = data.background { updates.push("background = ?".to_string()); params.push(v.clone()); }
 
     let query = format!("UPDATE characters SET {} WHERE id = ?", updates.join(", "));
     let mut q = sqlx::query(&query);
     for p in &params {
         q = q.bind(p);
     }
-    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+    q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
 
-    // 获取更新后的数据
     let row = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, String, String)>(
         "SELECT id, book_id, name, nickname, gender, age, appearance, personality, background, created_at, updated_at FROM characters WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -121,16 +105,14 @@ pub async fn delete_character(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<(), String> {
-    // 删除人物会级联删除关系和时间线（数据库约束）
     sqlx::query("DELETE FROM characters WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-// 获取人物关系
 #[tauri::command]
 pub async fn get_relationships(
     state: State<'_, AppState>,
@@ -140,7 +122,7 @@ pub async fn get_relationships(
         "SELECT id, book_id, char1_id, char2_id, relation_type, description, created_at FROM relationships WHERE book_id = ?"
     )
     .bind(&book_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -170,18 +152,13 @@ pub async fn add_relationship(
     .bind(&data.relation_type)
     .bind(&data.description)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(Relationship {
-        id,
-        book_id: data.book_id,
-        char1_id: data.char1_id,
-        char2_id: data.char2_id,
-        relation_type: data.relation_type,
-        description: data.description,
-        created_at: now,
+        id, book_id: data.book_id, char1_id: data.char1_id, char2_id: data.char2_id,
+        relation_type: data.relation_type, description: data.description, created_at: now,
     })
 }
 
@@ -192,7 +169,7 @@ pub async fn remove_relationship(
 ) -> Result<(), String> {
     sqlx::query("DELETE FROM relationships WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -207,7 +184,7 @@ pub async fn get_timeline_events(
         "SELECT id, character_id, chapter_id, event, event_time, order_index, created_at FROM timeline_events WHERE character_id = ? ORDER BY order_index"
     )
     .bind(&character_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -231,10 +208,10 @@ pub async fn add_timeline_event(
         "SELECT MAX(order_index) FROM timeline_events WHERE character_id = ?"
     )
     .bind(&data.character_id)
-    .fetch_optional(&*state.db.lock().unwrap())
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     let order_index = max_order.unwrap_or(-1) + 1;
 
     sqlx::query(
@@ -247,18 +224,13 @@ pub async fn add_timeline_event(
     .bind(&data.event_time)
     .bind(order_index)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(TimelineEvent {
-        id,
-        character_id: data.character_id,
-        chapter_id: data.chapter_id,
-        event: data.event,
-        event_time: data.event_time,
-        order_index,
-        created_at: now,
+        id, character_id: data.character_id, chapter_id: data.chapter_id,
+        event: data.event, event_time: data.event_time, order_index, created_at: now,
     })
 }
 
@@ -271,18 +243,9 @@ pub async fn update_timeline_event(
     let mut updates = vec![];
     let mut params: Vec<String> = vec![];
 
-    if let Some(ref event) = data.event {
-        updates.push("event = ?".to_string());
-        params.push(event.clone());
-    }
-    if let Some(ref time) = data.event_time {
-        updates.push("event_time = ?".to_string());
-        params.push(time.clone());
-    }
-    if let Some(ref chapter_id) = data.chapter_id {
-        updates.push("chapter_id = ?".to_string());
-        params.push(chapter_id.clone());
-    }
+    if let Some(ref event) = data.event { updates.push("event = ?".to_string()); params.push(event.clone()); }
+    if let Some(ref time) = data.event_time { updates.push("event_time = ?".to_string()); params.push(time.clone()); }
+    if let Some(ref chapter_id) = data.chapter_id { updates.push("chapter_id = ?".to_string()); params.push(chapter_id.clone()); }
 
     if !updates.is_empty() {
         let query = format!("UPDATE timeline_events SET {} WHERE id = ?", updates.join(", "));
@@ -290,20 +253,20 @@ pub async fn update_timeline_event(
         for p in &params {
             q = q.bind(p);
         }
-        q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+        q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
     }
 
     let row = sqlx::query_as::<_, (String, String, Option<String>, String, Option<String>, i32, String)>(
         "SELECT id, character_id, chapter_id, event, event_time, order_index, created_at FROM timeline_events WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(TimelineEvent {
-        id: row.0, character_id: row.1, chapter_id: row.2, event: row.3, event_time: row.4,
-        order_index: row.5, created_at: row.6,
+        id: row.0, character_id: row.1, chapter_id: row.2, event: row.3,
+        event_time: row.4, order_index: row.5, created_at: row.6,
     })
 }
 
@@ -314,7 +277,7 @@ pub async fn delete_timeline_event(
 ) -> Result<(), String> {
     sqlx::query("DELETE FROM timeline_events WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())

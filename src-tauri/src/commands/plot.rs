@@ -1,4 +1,4 @@
-// fix: 情节相关命令 - CRUD + 情绪标记
+// 情节相关命令 - CRUD + 情绪标记
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -14,7 +14,7 @@ pub async fn get_plots(
         "SELECT id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at FROM plots WHERE book_id = ? ORDER BY created_at"
     )
     .bind(&book_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -46,21 +46,14 @@ pub async fn create_plot(
     .bind(&data.chapter_id)
     .bind(&now)
     .bind(&now)
-    .execute(&*state.db.lock().unwrap())
+    .execute(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     Ok(Plot {
-        id,
-        book_id: data.book_id,
-        title: data.title,
-        description: data.description,
-        status: "active".to_string(),
-        target_word_count,
-        actual_word_count: 0,
-        chapter_id: data.chapter_id,
-        created_at: now.clone(),
-        updated_at: now,
+        id, book_id: data.book_id, title: data.title, description: data.description,
+        status: "active".to_string(), target_word_count, actual_word_count: 0,
+        chapter_id: data.chapter_id, created_at: now.clone(), updated_at: now,
     })
 }
 
@@ -71,13 +64,9 @@ pub async fn update_plot(
     data: UpdatePlot,
 ) -> Result<Plot, String> {
     let now = Utc::now().to_rfc3339();
-
-    // 逐字段拼接 SQL，避免宏导致的类型不匹配
     let mut set_clauses = vec!["updated_at = ?".to_string()];
     let mut str_params: Vec<String> = vec![now.clone()];
-    let mut int_params: Vec<i32> = vec![];
 
-    // String 字段
     if let Some(ref v) = data.title { set_clauses.push("title = ?".into()); str_params.push(v.clone()); }
     if let Some(ref v) = data.description { set_clauses.push("description = ?".into()); str_params.push(v.clone()); }
     if let Some(ref v) = data.status { set_clauses.push("status = ?".into()); str_params.push(v.clone()); }
@@ -89,13 +78,13 @@ pub async fn update_plot(
     let query = format!("UPDATE plots SET {} WHERE id = ?", set_clauses.join(", "));
     let mut q = sqlx::query(&query);
     for p in &str_params { q = q.bind(p); }
-    q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
+    q.bind(&id).execute(&state.db).await.map_err(|e| e.to_string())?;
 
     let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i32, i32, Option<String>, String, String)>(
         "SELECT id, book_id, title, description, status, target_word_count, actual_word_count, chapter_id, created_at, updated_at FROM plots WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
+    .fetch_one(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -113,7 +102,7 @@ pub async fn delete_plot(
 ) -> Result<(), String> {
     sqlx::query("DELETE FROM plots WHERE id = ?")
         .bind(&id)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -128,23 +117,21 @@ pub async fn update_emotion(
 ) -> Result<EmotionMark, String> {
     let now = Utc::now().to_rfc3339();
 
-    // 查找或创建情绪标记
     let existing: Option<(String,)> = sqlx::query_as(
         "SELECT id FROM emotion_marks WHERE plot_id = ? AND position = ?"
     )
     .bind(&plot_id)
     .bind(position)
-    .fetch_optional(&*state.db.lock().unwrap())
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
     if let Some((id,)) = existing {
-        // 更新现有
         sqlx::query("UPDATE emotion_marks SET expected_emotion = ?, actual_emotion = ? WHERE id = ?")
             .bind(&data.expected_emotion.unwrap_or(3))
             .bind(&data.actual_emotion.unwrap_or(3))
             .bind(&id)
-            .execute(&*state.db.lock().unwrap())
+            .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -152,7 +139,7 @@ pub async fn update_emotion(
             "SELECT id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at FROM emotion_marks WHERE id = ?"
         )
         .bind(&id)
-        .fetch_one(&*state.db.lock().unwrap())
+        .fetch_one(&state.db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -161,7 +148,6 @@ pub async fn update_emotion(
             expected_emotion: row.3, actual_emotion: row.4, position: row.5, created_at: row.6,
         })
     } else {
-        // 创建新标记
         let id = Uuid::new_v4().to_string();
         let emotion_level = position;
         let expected = data.expected_emotion.unwrap_or(3);
@@ -177,7 +163,7 @@ pub async fn update_emotion(
         .bind(actual)
         .bind(position)
         .bind(&now)
-        .execute(&*state.db.lock().unwrap())
+        .execute(&state.db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -197,7 +183,7 @@ pub async fn get_emotions(
         "SELECT id, plot_id, emotion_level, expected_emotion, actual_emotion, position, created_at FROM emotion_marks WHERE plot_id = ? ORDER BY position"
     )
     .bind(&plot_id)
-    .fetch_all(&*state.db.lock().unwrap())
+    .fetch_all(&state.db)
     .await
     .map_err(|e| e.to_string())?;
 
