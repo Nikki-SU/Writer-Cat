@@ -2,3 +2,5 @@ node_modules/
 *.log
 *.sh
 *.lock
+dist/
+*.patch
