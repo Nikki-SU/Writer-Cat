@@ -1,7 +1,7 @@
 // 左边栏主组件
 import { useState, useEffect } from 'react';
-import { useBookStore } from '../../stores/useBookStore';
-import { useStructureStore } from '../../stores/useStructureStore';
+import useBookStore from '../../stores/useBookStore';
+import useStructureStore from '../../stores/useStructureStore';
 import BookList from './BookList';
 import ChapterList from './ChapterList';
 import PlotCard from './PlotCard';

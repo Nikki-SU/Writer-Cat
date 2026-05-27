@@ -1,5 +1,5 @@
 // 书目列表
-import { useBookStore } from '../../stores/useBookStore';
+import useBookStore from '../../stores/useBookStore';
 import { useState } from 'react';
 
 function BookList() {

@@ -1,9 +1,9 @@
-// 情节页 - 网格卡片布局，从后端加载真实数据
+// 情节页 - 5×4正方形网格，每章一个格子（规格书要求）
 import { useEffect, useState } from 'react';
 import useBookStore from '../stores/useBookStore';
 import useStructureStore from '../stores/useStructureStore';
 import { plotApi } from '../api/plot';
-import EmotionCircle from '../components/common/EmotionCircle';
+import ChapterCard from '../components/PlotGrid/ChapterCard';
 
 export default function Plot() {
   const { currentBook, chapters } = useBookStore();
@@ -12,6 +12,7 @@ export default function Plot() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [createButtonPos, setCreateButtonPos] = useState({ x: 0, y: 0 });
 
   // 加载情节数据
   useEffect(() => {
@@ -29,6 +30,13 @@ export default function Plot() {
     } catch (e) {
       console.error('加载情节失败:', e);
     }
+  };
+
+  // 打开创建弹窗（贴近按钮）
+  const handleOpenCreate = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCreateButtonPos({ x: rect.left, y: rect.bottom });
+    setShowCreate(true);
   };
 
   // 创建情节
@@ -53,11 +61,22 @@ export default function Plot() {
 
   // 删除情节
   const handleDelete = async (id) => {
+    if (!window.confirm('确定要删除这个情节吗？')) return;
     try {
       await plotApi.deletePlot(id);
       loadPlots();
     } catch (e) {
       console.error('删除情节失败:', e);
+    }
+  };
+
+  // 更新情节的情绪
+  const handleUpdateEmotion = async (plotId, position, emotion) => {
+    try {
+      await plotApi.updateEmotion(plotId, position, { emotion });
+      loadPlots();
+    } catch (e) {
+      console.error('更新情绪失败:', e);
     }
   };
 
@@ -72,110 +91,119 @@ export default function Plot() {
     ).length;
   };
 
+  // 分配情节到章节
+  const getPlotsForChapter = (chapterId) => {
+    return plots.filter(p => p.chapter_id === chapterId);
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-body">情节总览</h1>
+        <h1 className="text-xl font-bold text-body">📊 情节总览</h1>
         <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+          onClick={handleOpenCreate}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition text-sm"
         >
           + 添加情节
         </button>
       </div>
 
-      {/* 情节网格 - 每章一个正方形格子 */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {plots.map((plot, index) => (
-          <div
-            key={plot.id}
-            className="aspect-square rounded-xl border-2 p-3 cursor-pointer transition hover:shadow-lg group relative"
-            style={{
-              borderColor: plot.status === 'resolved' ? '#00A087' :
-                          plot.status === 'active' ? '#4DBBD5' : '#8491B4'
-            }}
-          >
-            {/* 情绪圆环 */}
-            <div className="flex justify-center mb-2">
-              <EmotionCircle
-                expected={3}
-                actual={3}
-                size={60}
-              />
-            </div>
+      {/* 5×4 正方形网格 */}
+      <div className="grid grid-cols-5 gap-3">
+        {chapters.map((chapter, index) => {
+          const chapterPlots = getPlotsForChapter(chapter.id);
+          const totalWordCount = chapterPlots.reduce((sum, p) => sum + (p.actual_word_count || 0), 0);
+          const targetWordCount = chapter.target_word_count || 3000;
+          const isOk = totalWordCount >= targetWordCount;
+          
+          // 计算平均情绪
+          const avgExpected = chapterPlots.length > 0
+            ? Math.round(chapterPlots.reduce((sum, p) => sum + (p.expected_emotion || 3), 0) / chapterPlots.length)
+            : 3;
+          const avgActual = chapterPlots.length > 0
+            ? Math.round(chapterPlots.reduce((sum, p) => sum + (p.actual_emotion || 3), 0) / chapterPlots.length)
+            : 3;
 
-            {/* 情节信息 */}
-            <div className="text-center">
-              <div className="text-xs text-secondary mb-1 truncate">
-                {plot.chapter_id ? `第${index + 1}章` : '未关联章节'}
-              </div>
-              <div className="font-medium text-body truncate" title={plot.title}>
-                {plot.title}
-              </div>
-              <div className={`text-xs mt-1 ${isWordCountOk(plot) ? 'text-success' : 'text-error'}`}>
-                {(plot.actual_word_count || 0).toLocaleString()}字
-              </div>
-              {/* 伏笔标记 */}
-              {plot.chapter_id && getForeshadowCount(plot.chapter_id) > 0 && (
-                <div className="text-xs text-warning mt-1">
-                  📌 {getForeshadowCount(plot.chapter_id)}
-                </div>
-              )}
-            </div>
-
-            {/* 删除按钮 */}
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDelete(plot.id); }}
-              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-error transition"
-            >
-              ×
-            </button>
-          </div>
-        ))}
+          return (
+            <ChapterCard
+              key={chapter.id}
+              chapter={chapter}
+              chapterNumber={index + 1}
+              plots={chapterPlots}
+              isWordCountMet={isOk}
+              expectedEmotion={avgExpected}
+              actualEmotion={avgActual}
+              foreshadowCount={getForeshadowCount(chapter.id)}
+              totalWordCount={totalWordCount}
+              targetWordCount={targetWordCount}
+              onDelete={handleDelete}
+              onUpdateEmotion={handleUpdateEmotion}
+            />
+          );
+        })}
       </div>
 
-      {/* 新建情节弹窗 */}
+      {/* 无章节提示 */}
+      {chapters.length === 0 && currentBook && (
+        <div className="text-center py-16 text-secondary">
+          <p className="text-4xl mb-4">📖</p>
+          <p>还没有章节，请先在写作页创建章节</p>
+        </div>
+      )}
+
+      {/* 新建情节弹窗 - 贴近按钮位置 */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-80 shadow-xl animate-fadeIn">
-            <h2 className="text-xl font-bold mb-4">添加情节</h2>
+        <>
+          <div
+            className="fixed z-50 bg-white rounded-lg shadow-xl border p-4 w-72 animate-fadeIn"
+            style={{
+              left: `${createButtonPos.x}px`,
+              top: `${createButtonPos.y + 4}px`,
+            }}
+          >
+            <h3 className="text-base font-medium text-body mb-3">添加情节</h3>
             <input
               type="text"
               placeholder="情节标题"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               autoFocus
             />
             <textarea
               placeholder="情节描述（可选）"
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-              rows={3}
+              className="w-full px-3 py-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm"
+              rows={2}
             />
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => { setShowCreate(false); setNewTitle(''); setNewDesc(''); }}
-                className="px-4 py-2 text-secondary"
+                className="px-3 py-1.5 text-sm text-secondary hover:bg-gray-100 rounded"
               >
                 取消
               </button>
               <button
                 onClick={handleCreate}
-                className="px-4 py-2 bg-primary text-white rounded-lg"
+                className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 添加
               </button>
             </div>
           </div>
-        </div>
+          {/* 点击外部关闭 */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => { setShowCreate(false); setNewTitle(''); setNewDesc(''); }}
+          />
+        </>
       )}
 
-      {plots.length === 0 && currentBook && (
+      {!currentBook && (
         <div className="text-center py-16 text-secondary">
-          <p className="text-4xl mb-4">📝</p>
-          <p>还没有情节，点击上方按钮添加！</p>
+          <p className="text-4xl mb-4">📚</p>
+          <p>请先选择一本书籍</p>
         </div>
       )}
     </div>

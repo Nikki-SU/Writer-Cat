@@ -1,18 +1,19 @@
-// fix: AI 面板
-import { useState } from 'react';
+// fix: AI 面板 - 7个独立按钮（规格书要求）
+// AI检查3项: ❌错别字、🌍世界观冲突、👤人设冲突
+// AI提取4项: 👤提取人物、📋提取大事记、🎯提取伏笔、🌍提取世界观
+import { useState, useRef } from 'react';
 import useAiStore from '../../stores/useAiStore';
 import useBookStore from '../../stores/useBookStore';
 
 export default function AiPanel() {
   const { toggleAiPanel } = useAiStore();
   const { currentChapter, currentBook } = useBookStore();
-  const [activeTab, setActiveTab] = useState('check');
 
   return (
-    <div className="w-80 border-l bg-white flex flex-col">
+    <div className="w-80 border-l bg-white flex flex-col overflow-hidden">
       {/* 头部 */}
-      <div className="h-12 border-b flex items-center justify-between px-4">
-        <span className="font-medium">🤖 AI 助手</span>
+      <div className="h-12 border-b flex items-center justify-between px-4 flex-shrink-0">
+        <span className="font-medium text-body">🤖 AI 助手</span>
         <button
           onClick={toggleAiPanel}
           className="text-secondary hover:text-body"
@@ -21,208 +22,277 @@ export default function AiPanel() {
         </button>
       </div>
 
-      {/* 标签 */}
-      <div className="flex border-b">
-        <button
-          onClick={() => setActiveTab('check')}
-          className={`flex-1 py-2 text-sm transition ${
-            activeTab === 'check'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-secondary'
-          }`}
-        >
-          检查
-        </button>
-        <button
-          onClick={() => setActiveTab('extract')}
-          className={`flex-1 py-2 text-sm transition ${
-            activeTab === 'extract'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-secondary'
-          }`}
-        >
-          提取
-        </button>
-      </div>
-
-      {/* 内容 */}
+      {/* 内容区域 - 可滚动 */}
       <div className="flex-1 overflow-auto p-4">
-        {activeTab === 'check' && (
-          <CheckPanel bookId={currentBook?.id} chapterId={currentChapter?.id} />
-        )}
-        {activeTab === 'extract' && (
-          <ExtractPanel bookId={currentBook?.id} chapterId={currentChapter?.id} />
-        )}
+        <AiCheckSection bookId={currentBook?.id} chapterId={currentChapter?.id} />
+        <AiExtractSection bookId={currentBook?.id} chapterId={currentChapter?.id} />
       </div>
     </div>
   );
 }
 
-// AI 检查面板
-function CheckPanel({ bookId, chapterId }) {
-  const { isChecking, checkResult, checkText } = useAiStore();
+// AI 检查区域
+function AiCheckSection({ bookId, chapterId }) {
+  return (
+    <div className="mb-4">
+      <h3 className="text-sm font-medium text-body mb-2">🔍 AI检查</h3>
+      <div className="space-y-2">
+        <CheckButton
+          label="❌ 错别字检查"
+          type="typo"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-error/10"
+          borderClass="hover:border-error"
+        />
+        <CheckButton
+          label="🌍 世界观冲突"
+          type="worldview_conflict"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-warning/10"
+          borderClass="hover:border-warning"
+        />
+        <CheckButton
+          label="👤 人设冲突"
+          type="character_conflict"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-purple-50"
+          borderClass="hover:border-purple-400"
+        />
+      </div>
+    </div>
+  );
+}
 
-  const handleCheck = async () => {
-    if (!chapterId) return;
+// AI 提取区域
+function AiExtractSection({ bookId, chapterId }) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-body mb-2">📤 AI提取</h3>
+      <div className="space-y-2">
+        <ExtractButton
+          label="👤 提取人物"
+          type="character"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-primary/10"
+          borderClass="hover:border-primary"
+        />
+        <ExtractButton
+          label="📋 提取大事记"
+          type="timeline"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-secondary/10"
+          borderClass="hover:border-secondary"
+        />
+        <ExtractButton
+          label="🎯 提取伏笔"
+          type="foreshadow"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-warning/10"
+          borderClass="hover:border-warning"
+        />
+        <ExtractButton
+          label="🌍 提取世界观"
+          type="worldview"
+          bookId={bookId}
+          chapterId={chapterId}
+          colorClass="hover:bg-success/10"
+          borderClass="hover:border-success"
+        />
+      </div>
+    </div>
+  );
+}
+
+// 单个检查按钮
+function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }) {
+  const { checkResults, isChecking, checkText, checkWorldviewConflict, checkCharacterConflict } = useAiStore();
+  const [expanded, setExpanded] = useState(false);
+  const result = checkResults?.[type];
+  const isLoading = isChecking?.[type];
+
+  const handleClick = async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    
+    if (!chapterId) {
+      alert('请先选择要检查的章节');
+      return;
+    }
+
     try {
       // TODO: 从编辑器获取实际文本内容
-      await checkText('待检查的文本', bookId);
+      const text = '待检查的文本';
+      if (type === 'typo') {
+        await checkText(text, bookId);
+      } else if (type === 'worldview_conflict') {
+        await checkWorldviewConflict(text, bookId);
+      } else if (type === 'character_conflict') {
+        await checkCharacterConflict(text, bookId);
+      }
+      setExpanded(true);
     } catch (e) {
       console.error('检查失败:', e);
     }
   };
 
+  const getResultIcon = () => {
+    if (isLoading) return '⏳';
+    if (!result) return null;
+    if (result.length === 0) return '✅';
+    return '⚠️';
+  };
+
   return (
     <div>
       <button
-        onClick={handleCheck}
-        disabled={isChecking || !chapterId}
-        className="w-full px-4 py-2 bg-primary text-white rounded-lg disabled:opacity-50"
+        onClick={handleClick}
+        disabled={isLoading}
+        className={`w-full px-3 py-2 text-sm text-left rounded-lg border transition ${colorClass} ${borderClass} ${
+          isLoading ? 'opacity-50' : ''
+        }`}
       >
-        {isChecking ? '检查中...' : '开始检查'}
+        <div className="flex items-center justify-between">
+          <span>{label}</span>
+          {getResultIcon() && <span>{getResultIcon()}</span>}
+        </div>
       </button>
 
-      {checkResult && (
-        <div className="mt-4 space-y-3">
-          {/* 错别字 */}
-          {checkResult.typos?.length > 0 && (
-            <div className="p-3 bg-error/10 rounded-lg">
-              <div className="font-medium text-error mb-2">❌ 错别字</div>
-              {checkResult.typos.map((t, i) => (
-                <div key={i} className="text-sm py-1">
-                  <span className="typo-error">{t.text}</span>
-                  {t.suggestion && (
-                    <span className="text-success ml-2">→ {t.suggestion}</span>
+      {/* 结果展开面板 */}
+      {expanded && result && (
+        <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs max-h-48 overflow-auto">
+          {result.length === 0 ? (
+            <p className="text-success text-center py-2">✅ 未发现问题</p>
+          ) : (
+            <div className="space-y-2">
+              {result.map((item, idx) => (
+                <div key={idx} className={`p-2 rounded ${
+                  type === 'typo' ? 'bg-error/10 text-error' :
+                  type === 'worldview_conflict' ? 'bg-warning/10 text-warning' :
+                  'bg-purple-50 text-purple-700'
+                }`}>
+                  <div className="font-medium">{item.text || item.description}</div>
+                  {item.suggestion && (
+                    <div className="text-success mt-1">建议: {item.suggestion}</div>
+                  )}
+                  {item.character_name && (
+                    <div className="text-purple-600">人物: {item.character_name}</div>
+                  )}
+                  {item.chapter && (
+                    <div className="text-gray-500">章节: {item.chapter}</div>
                   )}
                 </div>
               ))}
             </div>
           )}
-
-          {/* 世界观冲突 */}
-          {checkResult.worldview_conflicts?.length > 0 && (
-            <div className="p-3 bg-warning/10 rounded-lg">
-              <div className="font-medium text-warning mb-2">🌍 世界观冲突</div>
-              {checkResult.worldview_conflicts.map((c, i) => (
-                <div key={i} className="text-sm py-1 worldview-conflict">
-                  {c.text}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 人设冲突 */}
-          {checkResult.character_conflicts?.length > 0 && (
-            <div className="p-3 bg-purple-50 rounded-lg">
-              <div className="font-medium text-purple-600 mb-2">👤 人设冲突</div>
-              {checkResult.character_conflicts.map((c, i) => (
-                <div key={i} className="text-sm py-1 character-conflict">
-                  <span className="font-medium">{c.character_name}:</span> {c.text}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(!checkResult.typos?.length && !checkResult.worldview_conflicts?.length && !checkResult.character_conflicts?.length) && (
-            <div className="text-center py-4 text-success">
-              ✅ 未发现问题
-            </div>
-          )}
-        </div>
-      )}
-
-      {!chapterId && (
-        <div className="text-center py-8 text-secondary text-sm">
-          请先选择要检查的章节
         </div>
       )}
     </div>
   );
 }
 
-// AI 提取面板
-function ExtractPanel({ bookId, chapterId }) {
-  const { isExtracting, extractResult, extractEntities } = useAiStore();
+// 单个提取按钮
+function ExtractButton({ label, type, bookId, chapterId, colorClass, borderClass }) {
+  const { extractResults, isExtracting, extractCharacters, extractTimeline, extractForeshadows, extractWorldviews } = useAiStore();
+  const [expanded, setExpanded] = useState(false);
+  const result = extractResults?.[type];
+  const isLoading = isExtracting?.[type];
 
-  const handleExtract = async () => {
-    if (!chapterId) return;
+  const handleClick = async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    
+    if (!chapterId) {
+      alert('请先选择要提取的章节');
+      return;
+    }
+
     try {
       // TODO: 从编辑器获取实际文本内容
-      await extractEntities('待提取的文本', bookId);
+      const text = '待提取的文本';
+      if (type === 'character') {
+        await extractCharacters(text, bookId);
+      } else if (type === 'timeline') {
+        await extractTimeline(text, bookId);
+      } else if (type === 'foreshadow') {
+        await extractForeshadows(text, bookId);
+      } else if (type === 'worldview') {
+        await extractWorldviews(text, bookId);
+      }
+      setExpanded(true);
     } catch (e) {
       console.error('提取失败:', e);
     }
   };
 
+  const getResultCount = () => {
+    if (!result) return null;
+    if (Array.isArray(result)) return result.length;
+    if (typeof result === 'object') return Object.keys(result).length;
+    return null;
+  };
+
   return (
     <div>
       <button
-        onClick={handleExtract}
-        disabled={isExtracting || !chapterId}
-        className="w-full px-4 py-2 bg-success text-white rounded-lg disabled:opacity-50"
+        onClick={handleClick}
+        disabled={isLoading}
+        className={`w-full px-3 py-2 text-sm text-left rounded-lg border transition ${colorClass} ${borderClass} ${
+          isLoading ? 'opacity-50' : ''
+        }`}
       >
-        {isExtracting ? '提取中...' : '提取信息'}
+        <div className="flex items-center justify-between">
+          <span>{label}</span>
+          {isLoading && <span className="animate-spin">⏳</span>}
+          {result && !isLoading && (
+            <span className="text-xs text-primary">{getResultCount()}项</span>
+          )}
+        </div>
       </button>
 
-      {extractResult && (
-        <div className="mt-4 space-y-3">
-          {/* 人物 */}
-          {extractResult.characters?.length > 0 && (
-            <div className="p-3 bg-primary/10 rounded-lg">
-              <div className="font-medium text-primary mb-2">👤 人物</div>
-              {extractResult.characters.map((c, i) => (
-                <div key={i} className="text-sm py-1 flex justify-between items-center">
-                  <span>{c.name}</span>
-                  <button className="text-xs text-primary hover:underline">
-                    添加到人物库
+      {/* 结果展开面板 */}
+      {expanded && result && (
+        <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs max-h-48 overflow-auto">
+          {Array.isArray(result) && result.length === 0 ? (
+            <p className="text-gray-500 text-center py-2">未提取到相关内容</p>
+          ) : (
+            <div className="space-y-2">
+              {type === 'character' && result.map?.((char, idx) => (
+                <div key={idx} className="p-2 bg-white rounded border">
+                  <div className="font-medium">{char.name}</div>
+                  {char.description && <div className="text-gray-500 mt-1">{char.description}</div>}
+                  <button className="text-xs text-primary hover:underline mt-1">
+                    添加到人物库 →
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* 大事记 */}
-          {extractResult.timeline?.length > 0 && (
-            <div className="p-3 bg-secondary/10 rounded-lg">
-              <div className="font-medium text-secondary mb-2">📅 大事记</div>
-              {extractResult.timeline.map((t, i) => (
-                <div key={i} className="text-sm py-1">
-                  {t.event}
-                  {t.chapter && <span className="text-secondary ml-2">@{t.chapter}</span>}
+              {type === 'timeline' && result.map?.((event, idx) => (
+                <div key={idx} className="p-2 bg-white rounded border">
+                  <div className="text-gray-500">{event.chapter}</div>
+                  <div>{event.event}</div>
+                </div>
+              ))}
+              {type === 'foreshadow' && result.map?.((item, idx) => (
+                <div key={idx} className="p-2 bg-warning/10 rounded">
+                  {item}
+                </div>
+              ))}
+              {type === 'worldview' && result.map?.((item, idx) => (
+                <div key={idx} className="p-2 bg-success/10 rounded">
+                  {item}
                 </div>
               ))}
             </div>
           )}
-
-          {/* 伏笔 */}
-          {extractResult.foreshadows?.length > 0 && (
-            <div className="p-3 bg-warning/10 rounded-lg">
-              <div className="font-medium text-warning mb-2">📌 伏笔</div>
-              {extractResult.foreshadows.map((f, i) => (
-                <div key={i} className="text-sm py-1">
-                  {f}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 世界观 */}
-          {extractResult.worldviews?.length > 0 && (
-            <div className="p-3 bg-success/10 rounded-lg">
-              <div className="font-medium text-success mb-2">🌍 世界观</div>
-              {extractResult.worldviews.map((w, i) => (
-                <div key={i} className="text-sm py-1">
-                  {w}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {!chapterId && (
-        <div className="text-center py-8 text-secondary text-sm">
-          请先选择要提取的章节
         </div>
       )}
     </div>

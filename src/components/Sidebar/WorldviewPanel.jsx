@@ -1,7 +1,10 @@
-// 世界观面板（可检索，有条目+挂载按钮）
-import { useState, useEffect } from 'react';
-import { useStructureStore } from '../../stores/useStructureStore';
-import { useBookStore } from '../../stores/useBookStore';
+// fix: 世界观面板（规格书要求）
+// 1. 可检索
+// 2. 有条目+⚪挂载按钮
+// 3. 点击⚪挂载按钮→挂载到当前章节当前光标位置（贴近按钮的小浮层）
+import { useState, useEffect, useRef } from 'react';
+import useStructureStore from '../../stores/useStructureStore';
+import useBookStore from '../../stores/useBookStore';
 
 function WorldviewPanel({ editorRef }) {
   const { currentBook, currentChapter } = useBookStore();
@@ -18,11 +21,15 @@ function WorldviewPanel({ editorRef }) {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addButtonPos, setAddButtonPos] = useState({ x: 0, y: 0 });
   const [newWorldviewName, setNewWorldviewName] = useState('');
   const [newWorldviewDesc, setNewWorldviewDesc] = useState('');
   const [expandedWorldview, setExpandedWorldview] = useState(null);
+  
+  // 挂载弹窗状态
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [attachingWorldview, setAttachingWorldview] = useState(null);
+  const [attachButtonPos, setAttachButtonPos] = useState({ x: 0, y: 0 });
 
   // 加载世界观数据
   useEffect(() => {
@@ -46,20 +53,44 @@ function WorldviewPanel({ editorRef }) {
     }
   };
 
-  // 点击挂载按钮
+  // 打开添加弹窗（贴近按钮）
+  const handleOpenAdd = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAddButtonPos({ x: rect.left, y: rect.bottom });
+    setShowAddModal(true);
+  };
+
+  // 点击⚪挂载按钮（贴近按钮位置弹出）
   const handleAttachClick = (worldview, e) => {
     e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAttachButtonPos({ x: rect.right + 4, y: rect.top - 80 });
     setAttachingWorldview(worldview);
     setShowAttachModal(true);
   };
 
   // 挂载世界观到当前章节
-  const handleAttach = async (position = '') => {
-    if (!attachingWorldview || !currentChapter) return;
+  const handleAttach = async () => {
+    if (!attachingWorldview || !currentChapter) {
+      alert('请先选择章节');
+      return;
+    }
     try {
+      // 获取编辑器光标位置
+      let position = '';
+      if (editorRef?.current?.getView?.()) {
+        const view = editorRef.current.getView();
+        position = view.state.selection.main.head;
+      }
+      
       await attachWorldview(attachingWorldview.id, currentChapter.id, position);
       setShowAttachModal(false);
       setAttachingWorldview(null);
+      
+      // 如果世界观详情已展开，刷新数据
+      if (expandedWorldview === attachingWorldview.id) {
+        await loadWorldviewChapters(attachingWorldview.id);
+      }
     } catch (error) {
       console.error('挂载世界观失败:', error);
     }
@@ -101,6 +132,13 @@ function WorldviewPanel({ editorRef }) {
     }
   };
 
+  // 检查是否挂载到当前章节
+  const isAttachedToCurrentChapter = (worldviewId) => {
+    return currentWorldviewChapters.some(
+      (c) => c.worldview_id === worldviewId && c.chapter_id === currentChapter?.id
+    );
+  };
+
   return (
     <div className="px-4 py-2">
       {/* 搜索框 */}
@@ -126,9 +164,7 @@ function WorldviewPanel({ editorRef }) {
       <div className="space-y-1 max-h-48 overflow-y-auto">
         {filteredWorldviews.map((w) => {
           const isExpanded = expandedWorldview === w.id;
-          const isAttachedToCurrentChapter = currentWorldviewChapters.some(
-            (c) => c.chapter_id === currentChapter?.id
-          );
+          const attached = isAttachedToCurrentChapter(w.id);
           
           return (
             <div key={w.id} className="border border-gray-100 dark:border-gray-600 rounded-lg overflow-hidden">
@@ -145,15 +181,15 @@ function WorldviewPanel({ editorRef }) {
                   {w.name}
                 </span>
                 
-                {/* 挂载按钮 */}
+                {/* ⚪挂载按钮 - 贴近此按钮弹出 */}
                 <button
                   onClick={(e) => handleAttachClick(w, e)}
-                  className={`w-5 h-5 rounded-full border text-xs flex items-center justify-center transition-colors ${
-                    isAttachedToCurrentChapter
+                  className={`w-5 h-5 rounded-full border text-xs flex items-center justify-center transition-colors flex-shrink-0 ${
+                    attached
                       ? 'bg-primary border-primary text-white'
                       : 'border-gray-300 text-gray-400 hover:border-primary hover:text-primary'
                   }`}
-                  title={isAttachedToCurrentChapter ? '已挂载到当前章节' : '挂载到当前章节'}
+                  title={attached ? '已挂载到当前章节' : '挂载到当前章节'}
                 >
                   ⚪
                 </button>
@@ -169,32 +205,34 @@ function WorldviewPanel({ editorRef }) {
                   )}
                   
                   {/* 挂载的章节 */}
-                  {currentWorldviewChapters.length > 0 && (
-                    <div className="space-y-1">
+                  {currentWorldviewChapters.filter(c => c.worldview_id === w.id).length > 0 && (
+                    <div className="space-y-1 mb-2">
                       <p className="text-xs text-gray-400">已挂载章节:</p>
-                      {currentWorldviewChapters.map((c) => (
-                        <div
-                          key={c.chapter_id}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {c.chapter_title || c.chapter_id.slice(0, 8)}
-                          </span>
-                          <button
-                            onClick={() => handleDetach(w.id, c.chapter_id)}
-                            className="text-xs text-error hover:bg-error/10 px-1 rounded"
+                      {currentWorldviewChapters
+                        .filter(c => c.worldview_id === w.id)
+                        .map((c) => (
+                          <div
+                            key={c.chapter_id}
+                            className="flex items-center justify-between text-sm"
                           >
-                            解绑
-                          </button>
-                        </div>
-                      ))}
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {c.chapter_title || c.chapter_id?.slice(0, 8)}
+                            </span>
+                            <button
+                              onClick={() => handleDetach(w.id, c.chapter_id)}
+                              className="text-xs text-error hover:bg-error/10 px-1 rounded"
+                            >
+                              解绑
+                            </button>
+                          </div>
+                        ))}
                     </div>
                   )}
                   
                   {/* 删除按钮 */}
                   <button
                     onClick={() => handleDeleteWorldview(w.id)}
-                    className="mt-2 text-xs text-error hover:bg-error/10 px-2 py-1 rounded"
+                    className="text-xs text-error hover:bg-error/10 px-2 py-1 rounded"
                   >
                     删除
                   </button>
@@ -212,17 +250,23 @@ function WorldviewPanel({ editorRef }) {
 
       {/* 添加按钮 */}
       <button
-        onClick={() => setShowAddModal(true)}
+        onClick={handleOpenAdd}
         className="w-full mt-2 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 rounded-lg border border-primary/20"
       >
         + 添加世界观
       </button>
 
-      {/* 添加世界观弹窗 */}
+      {/* 添加世界观弹窗 - 贴近按钮 */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 w-80 shadow-xl">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+        <>
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border p-4 w-72"
+            style={{
+              left: `${addButtonPos.x - 200}px`,
+              top: `${addButtonPos.y + 4}px`,
+            }}
+          >
+            <h3 className="text-base font-medium text-gray-800 dark:text-white mb-3">
               添加世界观
             </h3>
             
@@ -274,24 +318,39 @@ function WorldviewPanel({ editorRef }) {
               </button>
             </div>
           </div>
-        </div>
+          {/* 点击外部关闭 */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setShowAddModal(false);
+              setNewWorldviewName('');
+              setNewWorldviewDesc('');
+            }}
+          />
+        </>
       )}
 
-      {/* 挂载弹窗 */}
+      {/* 挂载弹窗 - 贴近⚪按钮 */}
       {showAttachModal && attachingWorldview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 w-80 shadow-xl">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+        <>
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border p-3 w-64"
+            style={{
+              left: `${attachButtonPos.x}px`,
+              top: `${attachButtonPos.y}px`,
+            }}
+          >
+            <h4 className="text-sm font-medium text-gray-800 dark:text-white mb-2">
               挂载「{attachingWorldview.name}」
-            </h3>
-            <p className="text-sm text-gray-500 mb-4">
+            </h4>
+            <p className="text-xs text-gray-500 mb-3">
               挂载到: {currentChapter?.title || '当前章节'}
             </p>
             
             <div className="flex gap-2">
               <button
-                onClick={() => handleAttach('')}
-                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                onClick={handleAttach}
+                className="flex-1 px-3 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 确认挂载
               </button>
@@ -300,13 +359,21 @@ function WorldviewPanel({ editorRef }) {
                   setShowAttachModal(false);
                   setAttachingWorldview(null);
                 }}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg"
+                className="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg"
               >
                 取消
               </button>
             </div>
           </div>
-        </div>
+          {/* 点击外部关闭 */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setShowAttachModal(false);
+              setAttachingWorldview(null);
+            }}
+          />
+        </>
       )}
     </div>
   );

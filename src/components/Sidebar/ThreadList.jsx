@@ -1,7 +1,7 @@
 // 线索/长伏笔列表组件
 import { useState, useEffect } from 'react';
-import { useStructureStore } from '../../stores/useStructureStore';
-import { useBookStore } from '../../stores/useBookStore';
+import useStructureStore from '../../stores/useStructureStore';
+import useBookStore from '../../stores/useBookStore';
 
 // 线索类型配置
 const THREAD_TYPES = {

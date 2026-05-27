@@ -1,28 +1,32 @@
-// 情节-情绪卡片（写作页使用，可划掉已完成情节，圆形3段标记）
+// fix: 情节-情绪卡片（规格书要求）
+// 1. 可划掉已完成情节
+// 2. 圆形3段标记点击弹出5色选择器（贴近圆旁边）
 import { useState, useEffect, useRef } from 'react';
-import { useBookStore } from '../../stores/useBookStore';
-import { EMOTION_COLORS } from '../../utils/constants';
+import useBookStore from '../../stores/useBookStore';
 
 // 情绪颜色
-const EMOTION_MAP = {
-  'deep-blue': '#1e3a5f',
-  'light-blue': '#93c5fd',
-  'white': '#f8fafc',
-  'light-red': '#fca5a5',
-  'deep-red': '#dc2626',
-};
+const EMOTION_COLORS_LIST = [
+  { id: 'deep-blue', color: '#1A237E', name: '深蓝-平静' },
+  { id: 'light-blue', color: '#64B5F6', name: '浅蓝-愉悦' },
+  { id: 'white', color: '#FFFFFF', name: '白-一般' },
+  { id: 'light-red', color: '#EF9A9A', name: '浅红-紧张' },
+  { id: 'deep-red', color: '#B71C1C', name: '深红-激烈' },
+];
 
 function PlotCard() {
   const { currentBook, currentChapter } = useBookStore();
   const [plots, setPlots] = useState([]);
   const [editingPlotId, setEditingPlotId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
-  const [showColorPicker, setShowColorPicker] = useState(null); // { plotId, type }
   
+  // 颜色选择器状态
+  const [showColorPicker, setShowColorPicker] = useState(null); // { plotId, type }
+  const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
+  const colorButtonRef = useRef(null);
+
   // 模拟数据（实际应从API加载）
   useEffect(() => {
     if (currentChapter) {
-      // TODO: 从plot store加载当前章节的情节
       setPlots([]);
     }
   }, [currentChapter]);
@@ -60,6 +64,19 @@ function PlotCard() {
     setPlots((prev) => prev.filter((p) => p.id !== plotId));
   };
 
+  // 打开颜色选择器（贴近情绪圆旁边）
+  const handleOpenColorPicker = (plotId, type, e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    // 根据类型决定位置
+    const offsetY = type === 'wordCount' ? -70 : type === 'expected' ? -50 : 10;
+    setPickerPos({
+      x: rect.right + 8,
+      y: rect.top + offsetY,
+    });
+    setShowColorPicker({ plotId, type });
+  };
+
   // 更新情绪颜色
   const handleEmotionChange = (plotId, type, colorId) => {
     setPlots((prev) =>
@@ -86,9 +103,9 @@ function PlotCard() {
       completed: false,
       orderIndex: plots.length,
       emotionColors: {
-        wordCount: 'white',     // 字数达标
-        expected: 'white',      // 预计情绪
-        actual: 'white',        // 实际情绪
+        wordCount: 'white',
+        expected: 'white',
+        actual: 'white',
       },
       wordCountTarget: 3000,
       wordCountActual: 0,
@@ -96,6 +113,12 @@ function PlotCard() {
     setPlots((prev) => [...prev, newPlot]);
     setEditingPlotId(newPlot.id);
     setEditingContent('');
+  };
+
+  // 获取颜色
+  const getColor = (colorId) => {
+    const found = EMOTION_COLORS_LIST.find((c) => c.id === colorId);
+    return found?.color || '#FFFFFF';
   };
 
   return (
@@ -126,7 +149,7 @@ function PlotCard() {
           return (
             <div
               key={plot.id}
-              className={`flex items-start gap-2 px-3 py-2 rounded-lg transition-colors ${
+              className={`flex items-start gap-2 px-3 py-2 rounded-lg transition-colors relative ${
                 plot.completed
                   ? 'bg-gray-100 dark:bg-gray-700/50'
                   : 'hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -172,27 +195,28 @@ function PlotCard() {
                 )}
               </div>
               
-              {/* 圆形3段标记 */}
-              <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+              {/* 圆形3段标记 - 点击弹出选择器（贴近圆旁边） */}
+              <div className="flex flex-col items-center gap-0.5 flex-shrink-0 relative">
                 {/* 上段：字数达标 */}
                 <button
-                  onClick={() => setShowColorPicker({ plotId: plot.id, type: 'wordCount' })}
+                  ref={colorButtonRef}
+                  onClick={(e) => handleOpenColorPicker(plot.id, 'wordCount', e)}
                   className="w-4 h-2 rounded-t-full border border-gray-300"
-                  style={{ backgroundColor: EMOTION_MAP[emotionColors.wordCount] }}
+                  style={{ backgroundColor: isWordCountMet ? '#00A087' : '#E64B35' }}
                   title={`字数: ${plot.wordCountActual || 0}/${plot.wordCountTarget || 3000}`}
                 />
                 {/* 中段：预计情绪 */}
                 <button
-                  onClick={() => setShowColorPicker({ plotId: plot.id, type: 'expected' })}
+                  onClick={(e) => handleOpenColorPicker(plot.id, 'expected', e)}
                   className="w-4 h-2 border-x border-gray-300"
-                  style={{ backgroundColor: EMOTION_MAP[emotionColors.expected] }}
+                  style={{ backgroundColor: getColor(emotionColors.expected) }}
                   title="预计情绪"
                 />
                 {/* 下段：实际情绪 */}
                 <button
-                  onClick={() => setShowColorPicker({ plotId: plot.id, type: 'actual' })}
+                  onClick={(e) => handleOpenColorPicker(plot.id, 'actual', e)}
                   className="w-4 h-2 rounded-b-full border border-gray-300"
-                  style={{ backgroundColor: EMOTION_MAP[emotionColors.actual] }}
+                  style={{ backgroundColor: getColor(emotionColors.actual) }}
                   title="实际情绪"
                 />
               </div>
@@ -216,21 +240,6 @@ function PlotCard() {
               >
                 ×
               </button>
-              
-              {/* 颜色选择器 */}
-              {showColorPicker?.plotId === plot.id && (
-                <div className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 p-2 z-50 flex gap-1">
-                  {EMOTION_COLORS.map((color) => (
-                    <button
-                      key={color.id}
-                      onClick={() => handleEmotionChange(plot.id, showColorPicker.type, color.id)}
-                      className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
-                      style={{ backgroundColor: color.color }}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -240,8 +249,42 @@ function PlotCard() {
           </p>
         )}
       </div>
+
+      {/* 颜色选择器 - 贴近情绪圆旁边 */}
+      {showColorPicker && (
+        <>
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border p-2 flex gap-1"
+            style={{
+              left: `${pickerPos.x}px`,
+              top: `${pickerPos.y}px`,
+            }}
+          >
+            {EMOTION_COLORS_LIST.map((color) => (
+              <button
+                key={color.id}
+                onClick={() => handleEmotionChange(showColorPicker.plotId, showColorPicker.type, color.id)}
+                className="w-6 h-6 rounded-full border-2 hover:scale-110 transition-transform"
+                style={{
+                  backgroundColor: color.color,
+                  borderColor: color.color === '#FFFFFF' ? '#e5e7eb' : color.color,
+                }}
+                title={color.name}
+              />
+            ))}
+          </div>
+          {/* 点击外部关闭 */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowColorPicker(null)}
+          />
+        </>
+      )}
     </div>
   );
 }
 
 export default PlotCard;
+
+// 导出颜色列表供其他组件使用
+export { EMOTION_COLORS_LIST };
