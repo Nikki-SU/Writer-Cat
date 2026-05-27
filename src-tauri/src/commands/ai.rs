@@ -54,7 +54,7 @@ pub struct TimelineItem {
 #[tauri::command]
 pub async fn check_text(
     text: String,
-    book_id: String,
+    _book_id: String,
 ) -> Result<TextCheckResult, String> {
     let status = crate::commands::ollama::check_ollama_status().await?;
 
@@ -105,7 +105,7 @@ pub async fn check_text(
 #[tauri::command]
 pub async fn extract_entities(
     text: String,
-    book_id: String,
+    _book_id: String,
 ) -> Result<ExtractResult, String> {
     let status = crate::commands::ollama::check_ollama_status().await?;
 

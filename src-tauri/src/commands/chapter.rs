@@ -1,6 +1,6 @@
 // 章节相关命令 - CRUD + 排序 + 文件读写 + 自动保存 + 导出
 use crate::commands::book::get_data_dir;
-use crate::models::{Backup, Chapter, ChapterOrder, CreateChapter, ReorderChapters, UpdateChapter};
+use crate::models::{Backup, Chapter, CreateChapter, ReorderChapters, UpdateChapter};
 use crate::AppState;
 use std::fs;
 use tauri::State;

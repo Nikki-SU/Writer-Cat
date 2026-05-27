@@ -1,4 +1,4 @@
-// 全局样式和 TailwindCSS
+/* 全局样式和 TailwindCSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
