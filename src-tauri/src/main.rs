@@ -1,4 +1,4 @@
-// Writer-Cat 入口文件
+// fix: 分离 main.rs 入口文件
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {

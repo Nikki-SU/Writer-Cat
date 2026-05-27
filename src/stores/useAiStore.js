@@ -1,4 +1,4 @@
-// AI Store
+// fix: AI Store
 import { create } from 'zustand';
 import { aiApi } from '../api/ai';
 

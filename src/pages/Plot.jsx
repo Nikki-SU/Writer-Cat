@@ -1,4 +1,4 @@
-// 情节页 - 网格卡片布局
+// fix: 情节页 - 网格卡片布局
 import { useEffect, useState } from 'react';
 import useBookStore from '../stores/useBookStore';
 import useStructureStore from '../stores/useStructureStore';

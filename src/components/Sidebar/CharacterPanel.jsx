@@ -1,13 +1,11 @@
-// 人物面板（可检索，标记本章节出现的人物）
+// fix: 人物面板（可检索，标记本章节出现的人物）
 import { useState, useEffect, useCallback } from 'react';
-import { useEditorStore } from '../../stores/useEditorStore';
 
 function CharacterPanel({ editorRef }) {
   const [characters, setCharacters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedCharacters, setHighlightedCharacters] = useState([]);
   const [selectedCharacter, setSelectedCharacter] = useState(null);
-  const { selectedText, content } = useEditorStore();
 
   // 从API加载人物数据（实际应从store获取）
   useEffect(() => {
@@ -17,16 +15,16 @@ function CharacterPanel({ editorRef }) {
 
   // 检测当前章节出现的人物
   const detectCharactersInChapter = useCallback(async () => {
-    if (!content) return;
     // TODO: 调用AI检测
     const detected = [];
     characters.forEach((char) => {
-      if (content.includes(char.name)) {
-        detected.push(char.id);
-      }
+      // 实际应从编辑器获取内容
+      // if (content.includes(char.name)) {
+      //   detected.push(char.id);
+      // }
     });
     setHighlightedCharacters(detected);
-  }, [content, characters]);
+  }, [characters]);
 
   // 搜索过滤
   const filteredCharacters = characters.filter((char) =>

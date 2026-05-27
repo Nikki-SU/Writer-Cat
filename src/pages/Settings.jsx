@@ -1,4 +1,4 @@
-// 设置页
+// fix: 设置页
 import { useEffect, useState } from 'react';
 import useSettingsStore from '../stores/useSettingsStore';
 import OllamaInstaller from '../components/OllamaInstaller';

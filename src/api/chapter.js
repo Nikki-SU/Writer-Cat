@@ -1,4 +1,4 @@
-// 章节 API
+// fix: 章节 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const chapterApi = {

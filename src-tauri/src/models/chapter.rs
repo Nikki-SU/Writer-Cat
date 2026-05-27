@@ -1,4 +1,4 @@
-// 章节模型
+// fix: 章节模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

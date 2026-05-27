@@ -1,4 +1,4 @@
-// 章节相关命令 - CRUD + 排序 + 文件读写 + 自动保存 + 导出
+// fix: 章节相关命令 - CRUD + 排序 + 文件读写 + 自动保存 + 导出
 use crate::commands::book::get_data_dir;
 use crate::models::{Backup, Chapter, ChapterOrder, CreateChapter, ReorderChapters, UpdateChapter};
 use crate::AppState;
@@ -20,6 +20,31 @@ fn get_backup_dir(book_id: &str, chapter_id: &str) -> std::path::PathBuf {
         .join(book_id)
         .join(".backups")
         .join(chapter_id)
+}
+
+// 辅助函数：获取章节信息
+pub async fn get_chapter_by_id(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Chapter, String> {
+    let row = sqlx::query_as::<_, (String, String, String, i32, i32, String, String, String)>(
+        "SELECT id, book_id, title, order_index, word_count, status, created_at, updated_at FROM chapters WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(Chapter {
+        id: row.0,
+        book_id: row.1,
+        title: row.2,
+        order_index: row.3,
+        word_count: row.4,
+        status: row.5,
+        created_at: row.6,
+        updated_at: row.7,
+    })
 }
 
 #[tauri::command]
@@ -96,24 +121,7 @@ pub async fn get_chapter(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Chapter, String> {
-    let row = sqlx::query_as::<_, (String, String, String, i32, i32, String, String, String)>(
-        "SELECT id, book_id, title, order_index, word_count, status, created_at, updated_at FROM chapters WHERE id = ?"
-    )
-    .bind(&id)
-    .fetch_one(&*state.db.lock().unwrap())
-    .await
-    .map_err(|e| e.to_string())?;
-
-    Ok(Chapter {
-        id: row.0,
-        book_id: row.1,
-        title: row.2,
-        order_index: row.3,
-        word_count: row.4,
-        status: row.5,
-        created_at: row.6,
-        updated_at: row.7,
-    })
+    get_chapter_by_id(state, id).await
 }
 
 #[tauri::command]
@@ -142,7 +150,7 @@ pub async fn update_chapter(
     }
     q.bind(&id).execute(&*state.db.lock().unwrap()).await.map_err(|e| e.to_string())?;
 
-    get_chapter(state, id).await
+    get_chapter_by_id(state, id).await
 }
 
 #[tauri::command]
@@ -150,7 +158,7 @@ pub async fn delete_chapter(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<(), String> {
-    let chapter = get_chapter(state.clone(), id.clone()).await?;
+    let chapter = get_chapter_by_id(state.clone(), id.clone()).await?;
 
     sqlx::query("DELETE FROM chapters WHERE id = ?")
         .bind(&id)
@@ -199,7 +207,7 @@ pub async fn read_chapter_content(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<String, String> {
-    let chapter = get_chapter(state, id).await?;
+    let chapter = get_chapter_by_id(state, id).await?;
     let path = get_chapter_path(&chapter.book_id, &chapter.id);
     
     fs::read_to_string(&path).map_err(|e| e.to_string())
@@ -211,7 +219,7 @@ pub async fn write_chapter_content(
     id: String,
     content: String,
 ) -> Result<i32, String> {
-    let chapter = get_chapter(state.clone(), id.clone()).await?;
+    let chapter = get_chapter_by_id(state.clone(), id.clone()).await?;
     let path = get_chapter_path(&chapter.book_id, &chapter.id);
     
     // 计算字数
@@ -268,7 +276,7 @@ pub async fn get_backups(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Vec<Backup>, String> {
-    let chapter = get_chapter(state, id).await?;
+    let chapter = get_chapter_by_id(state, id).await?;
     let backup_dir = get_backup_dir(&chapter.book_id, &chapter.id);
 
     if !backup_dir.exists() {
@@ -313,7 +321,7 @@ pub async fn export_chapter(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<String, String> {
-    let chapter = get_chapter(state, id).await?;
+    let chapter = get_chapter_by_id(state, id).await?;
     let path = get_chapter_path(&chapter.book_id, &chapter.id);
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     Ok(format!("# {}\n\n{}", chapter.title, content))
@@ -329,9 +337,8 @@ pub async fn export_book(
     use zip::ZipWriter;
 
     let book = crate::commands::book::get_book(state.clone(), book_id.clone()).await?;
-    let chapters = get_chapters(state, book_id.clone()).await?;
+    let chapters = get_chapters(state.clone(), book_id.clone()).await?;
     let data_path = get_data_dir();
-    let book_dir = data_path.join("books").join(&book_id);
 
     // 创建 zip
     let zip_path = data_path.join("sync").join(format!("{}.zip", book_id));
@@ -357,7 +364,7 @@ pub async fn export_book(
     }
 
     // 添加 assets
-    let assets_dir = book_dir.join("assets");
+    let assets_dir = data_path.join("books").join(&book_id).join("assets");
     if assets_dir.exists() {
         for entry in walkdir::WalkDir::new(&assets_dir) {
             let entry = entry.map_err(|e| e.to_string())?;

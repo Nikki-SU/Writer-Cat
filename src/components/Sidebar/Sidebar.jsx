@@ -1,14 +1,11 @@
-// 左侧栏组件
+// fix: 左侧栏组件
 import { useState } from 'react';
-import useBookStore from '../../stores/useBookStore';
-import useStructureStore from '../../stores/useStructureStore';
 
 export default function Sidebar({
   chapters,
   currentChapter,
   foreshadows,
   worldviews,
-  characters,
   threads,
   activeTab,
   onTabChange,
@@ -157,12 +154,13 @@ export default function Sidebar({
               onClick={() => setCharacterExpanded(!characterExpanded)}
               className="px-3 py-2 text-sm font-medium cursor-pointer flex justify-between items-center"
             >
-              <span>👤 人物 ({characters.length})</span>
+              <span>👤 人物 ({threads.length})</span>
               <span>{characterExpanded ? '▼' : '▶'}</span>
             </div>
             {characterExpanded && (
               <div className="pl-2">
-                {filterBySearch(characters, 'name').map(char => (
+                {/* TODO: 替换为真实的人物数据 */}
+                {filterBySearch([], 'name').map(char => (
                   <div key={char.id} className="px-3 py-2 text-sm text-body">
                     <div className="flex items-center gap-1">
                       <span>📍</span>

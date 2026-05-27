@@ -1,4 +1,4 @@
-// 设置相关命令
+// fix: 设置相关命令
 use crate::commands::book::get_data_dir;
 use crate::AppState;
 use serde::{Deserialize, Serialize};

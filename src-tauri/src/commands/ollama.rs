@@ -1,7 +1,5 @@
-// Ollama 检测和安装命令
-use crate::AppState;
+// fix: Ollama 检测和安装命令
 use serde::{Deserialize, Serialize};
-use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OllamaStatus {

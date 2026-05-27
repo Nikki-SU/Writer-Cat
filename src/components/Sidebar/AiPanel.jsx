@@ -1,4 +1,4 @@
-// AI 面板
+// fix: AI 面板
 import { useState } from 'react';
 import useAiStore from '../../stores/useAiStore';
 import useBookStore from '../../stores/useBookStore';
@@ -65,6 +65,7 @@ function CheckPanel({ bookId, chapterId }) {
   const handleCheck = async () => {
     if (!chapterId) return;
     try {
+      // TODO: 从编辑器获取实际文本内容
       await checkText('待检查的文本', bookId);
     } catch (e) {
       console.error('检查失败:', e);
@@ -146,6 +147,7 @@ function ExtractPanel({ bookId, chapterId }) {
   const handleExtract = async () => {
     if (!chapterId) return;
     try {
+      // TODO: 从编辑器获取实际文本内容
       await extractEntities('待提取的文本', bookId);
     } catch (e) {
       console.error('提取失败:', e);

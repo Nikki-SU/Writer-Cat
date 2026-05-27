@@ -1,4 +1,4 @@
-// 人物 API
+// fix: 人物 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const characterApi = {
@@ -13,6 +13,9 @@ export const characterApi = {
   
   // 删除人物
   deleteCharacter: (id) => invoke('delete_character', { id }),
+  
+  // 获取人物关系
+  getRelationships: (bookId) => invoke('get_relationships', { bookId }),
   
   // 添加关系
   addRelationship: (data) => invoke('add_relationship', { data }),

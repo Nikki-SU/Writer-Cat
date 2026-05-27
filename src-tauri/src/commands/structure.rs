@@ -1,4 +1,4 @@
-// 伏笔和世界观相关命令 - 双向互锁 + 挂载
+// fix: 伏笔和世界观相关命令 - 双向互锁 + 挂载
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -139,7 +139,8 @@ pub async fn delete_foreshadow(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// 解决伏笔 - 双向互锁：同时设置 resolved_chapter_id
@@ -280,7 +281,8 @@ pub async fn delete_worldview(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 async fn get_worldview_mounts(
@@ -337,5 +339,6 @@ pub async fn unmount_worldview(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

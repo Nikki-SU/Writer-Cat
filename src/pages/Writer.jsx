@@ -1,6 +1,5 @@
-// 写作页 - 左侧栏 + 编辑器
+// fix: 写作页 - 左侧栏 + 编辑器
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
 import useBookStore from '../stores/useBookStore';
 import useEditorStore from '../stores/useEditorStore';
 import useStructureStore from '../stores/useStructureStore';
@@ -10,10 +9,9 @@ import Editor from '../components/Editor/Editor';
 import AiPanel from '../components/Sidebar/AiPanel';
 
 export default function Writer() {
-  const navigate = useNavigate();
   const { currentBook, chapters, currentChapter, selectChapter, createChapter, reorderChapters, copyToClipboard, exportChapter, exportBook } = useBookStore();
   const { content, setContent, saveContent } = useEditorStore();
-  const { foreshadows, worldviews, characters, threads, loadStructures } = useStructureStore();
+  const { foreshadows, worldviews, threads } = useStructureStore();
   const { aiPanelOpen, toggleAiPanel } = useAiStore();
   const [sidebarTab, setSidebarTab] = useState('chapters');
   const [showChapterCreate, setShowChapterCreate] = useState(false);
@@ -63,7 +61,6 @@ export default function Writer() {
         currentChapter={currentChapter}
         foreshadows={foreshadows}
         worldviews={worldviews}
-        characters={characters}
         threads={threads}
         activeTab={sidebarTab}
         onTabChange={setSidebarTab}

@@ -1,4 +1,4 @@
-// 设置 API
+// fix: 设置 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const settingsApi = {

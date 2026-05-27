@@ -1,4 +1,4 @@
-// 结构和伏笔 API
+// fix: 结构和伏笔 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const structureApi = {

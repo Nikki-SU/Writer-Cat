@@ -1,4 +1,4 @@
-// 书籍模型
+// fix: 书籍模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

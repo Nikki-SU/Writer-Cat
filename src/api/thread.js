@@ -1,4 +1,4 @@
-// 线索 API
+// fix: 线索 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const threadApi = {

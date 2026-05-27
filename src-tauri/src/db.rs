@@ -1,6 +1,7 @@
-// 数据库初始化和迁移
+// fix: 分离数据库初始化模块
 use sqlx::SqlitePool;
 
+// 数据库初始化和迁移
 pub async fn init_db(pool: &SqlitePool) -> Result<(), String> {
     // 创建书籍表
     sqlx::query(

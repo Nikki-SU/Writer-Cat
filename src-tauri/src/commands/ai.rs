@@ -1,9 +1,7 @@
-// AI 检查和提取命令
+// fix: AI 检查和提取命令
 use crate::commands::ollama::OllamaStatus;
-use crate::AppState;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextCheckResult {

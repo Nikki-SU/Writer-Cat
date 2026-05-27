@@ -1,4 +1,4 @@
-// 导出所有命令模块
+// fix: 分离命令模块入口
 pub mod ai;
 pub mod book;
 pub mod chapter;

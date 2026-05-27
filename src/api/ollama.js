@@ -1,4 +1,4 @@
-// Ollama API封装
+// fix: Ollama API封装
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -11,59 +11,28 @@ export async function checkOllamaStatus() {
 }
 
 /**
- * 下载并安装Ollama
- * @returns {Promise<void>}
+ * 获取Ollama安装指引
+ * @returns {Promise<string>}
  */
 export async function installOllama() {
   return await invoke('install_ollama');
 }
 
 /**
- * 启动Ollama服务
- * @returns {Promise<void>}
+ * 拉取模型
+ * @param {string} model - 模型名称
+ * @returns {Promise<string>}
  */
-export async function startOllama() {
-  return await invoke('start_ollama');
+export async function pullModel(model) {
+  return await invoke('pull_model', { model });
 }
 
 /**
- * 拉取默认模型
- * @returns {Promise<void>}
+ * 获取已安装模型列表
+ * @returns {Promise<OllamaModel[]>}
  */
-export async function pullDefaultModel() {
-  return await invoke('pull_default_model');
-}
-
-/**
- * 跳过AI安装（无AI模式）
- * @returns {Promise<void>}
- */
-export async function skipAiInstall() {
-  return await invoke('skip_ai_install');
-}
-
-/**
- * 检查是否已跳过AI安装
- * @returns {Promise<boolean>}
- */
-export async function isAiSkipped() {
-  return await invoke('is_ai_skipped');
-}
-
-/**
- * 检查是否是首次启动
- * @returns {Promise<boolean>}
- */
-export async function isFirstLaunch() {
-  return await invoke('is_first_launch');
-}
-
-/**
- * 标记首次启动完成
- * @returns {Promise<void>}
- */
-export async function completeFirstLaunch() {
-  return await invoke('complete_first_launch');
+export async function getModels() {
+  return await invoke('get_models');
 }
 
 /**

@@ -1,4 +1,4 @@
-// 线索和长伏笔相关命令 - 线性/分支/收束链式结构
+// fix: 线索和长伏笔相关命令 - 线性/分支/收束链式结构
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -145,7 +145,8 @@ pub async fn delete_thread(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -255,5 +256,6 @@ pub async fn delete_thread_node(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

@@ -1,9 +1,17 @@
-// 书籍相关命令 - 创建/切换/删除/重命名/文件系统操作
+// fix: 书籍相关命令 - 只包含书籍 CRUD
 use crate::models::{Book, CreateBook, UpdateBook};
 use crate::AppState;
 use tauri::State;
 use uuid::Uuid;
 use chrono::Utc;
+
+// 辅助函数：获取数据目录
+pub fn get_data_dir() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("writer-cat")
+        .join("data")
+}
 
 #[tauri::command]
 pub async fn create_book(
@@ -141,11 +149,4 @@ pub async fn delete_book(
 #[tauri::command]
 pub fn get_data_path() -> Result<String, String> {
     Ok(get_data_dir().to_string_lossy().to_string())
-}
-
-fn get_data_dir() -> std::path::PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("writer-cat")
-        .join("data")
 }

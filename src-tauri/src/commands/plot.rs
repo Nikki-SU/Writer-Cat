@@ -1,4 +1,4 @@
-// 情节相关命令 - CRUD + 情绪标记
+// fix: 情节相关命令 - CRUD + 情绪标记
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -121,7 +121,8 @@ pub async fn delete_plot(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]

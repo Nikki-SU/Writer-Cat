@@ -1,4 +1,4 @@
-// 情节和情绪模型
+// fix: 情节和情绪模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

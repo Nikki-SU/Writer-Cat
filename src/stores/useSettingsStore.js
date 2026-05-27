@@ -1,4 +1,4 @@
-// 设置 Store
+// fix: 设置 Store
 import { create } from 'zustand';
 import { settingsApi } from '../api/settings';
 import { aiApi } from '../api/ai';

@@ -1,4 +1,4 @@
-// 编辑器 Store
+// fix: 编辑器 Store
 import { create } from 'zustand';
 import { chapterApi } from '../api/chapter';
 

@@ -1,4 +1,4 @@
-// 人物相关命令 - CRUD + 关系双向同步 + 时间线
+// fix: 人物相关命令 - CRUD + 关系 + 时间线
 use crate::models::*;
 use crate::AppState;
 use tauri::State;
@@ -126,7 +126,30 @@ pub async fn delete_character(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// 获取人物关系
+#[tauri::command]
+pub async fn get_relationships(
+    state: State<'_, AppState>,
+    book_id: String,
+) -> Result<Vec<Relationship>, String> {
+    let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<String>, String)>(
+        "SELECT id, book_id, char1_id, char2_id, relation_type, description, created_at FROM relationships WHERE book_id = ?"
+    )
+    .bind(&book_id)
+    .fetch_all(&*state.db.lock().unwrap())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, book_id, char1_id, char2_id, relation_type, description, created_at)| Relationship {
+            id, book_id, char1_id, char2_id, relation_type, description, created_at,
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -171,7 +194,8 @@ pub async fn remove_relationship(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -292,5 +316,6 @@ pub async fn delete_timeline_event(
         .bind(&id)
         .execute(&*state.db.lock().unwrap())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

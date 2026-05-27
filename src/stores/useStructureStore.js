@@ -1,4 +1,4 @@
-// 结构和伏笔 Store
+// fix: 结构和伏笔 Store
 import { create } from 'zustand';
 import { structureApi } from '../api/structure';
 import { threadApi } from '../api/thread';
@@ -205,7 +205,7 @@ const useStructureStore = create((set, get) => ({
       });
       set((state) => ({
         threads: state.threads.map((t) =>
-          t.id === threadId ? { ...t, nodes: [...t.nodes, node] } : t
+          t.id === threadId ? { ...t, nodes: [...(t.nodes || []), node] } : t
         ),
       }));
       return node;
@@ -222,7 +222,7 @@ const useStructureStore = create((set, get) => ({
       set((state) => ({
         threads: state.threads.map((t) =>
           t.id === threadId
-            ? { ...t, nodes: t.nodes.map((n) => (n.id === nodeId ? node : n)) }
+            ? { ...t, nodes: (t.nodes || []).map((n) => (n.id === nodeId ? node : n)) }
             : t
         ),
       }));
@@ -240,7 +240,7 @@ const useStructureStore = create((set, get) => ({
       set((state) => ({
         threads: state.threads.map((t) =>
           t.id === threadId
-            ? { ...t, nodes: t.nodes.filter((n) => n.id !== nodeId) }
+            ? { ...t, nodes: (t.nodes || []).filter((n) => n.id !== nodeId) }
             : t
         ),
       }));

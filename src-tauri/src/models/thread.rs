@@ -1,4 +1,4 @@
-// 线索和长伏笔模型
+// fix: 线索和长伏笔模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

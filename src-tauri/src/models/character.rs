@@ -1,4 +1,4 @@
-// 人物模型
+// fix: 人物模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

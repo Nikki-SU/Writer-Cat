@@ -1,4 +1,4 @@
-// 伏笔和世界观模型
+// fix: 伏笔和世界观模型
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

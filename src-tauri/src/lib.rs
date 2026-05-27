@@ -37,7 +37,7 @@ pub fn run() {
     // 初始化数据库表
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        db::init_db(&pool).await.expect("数据库初始化失败");
+        db::init_db(&pool).expect("数据库初始化失败");
     });
 
     tauri::Builder::default()
@@ -62,13 +62,17 @@ pub fn run() {
             commands::chapter::write_chapter_content,
             commands::chapter::get_backups,
             commands::chapter::restore_backup,
+            commands::chapter::export_chapter,
+            commands::chapter::export_book,
             // 人物相关
             commands::character::get_characters,
             commands::character::create_character,
             commands::character::update_character,
             commands::character::delete_character,
+            commands::character::get_relationships,
             commands::character::add_relationship,
             commands::character::remove_relationship,
+            commands::character::get_timeline_events,
             commands::character::add_timeline_event,
             commands::character::update_timeline_event,
             commands::character::delete_timeline_event,
@@ -78,6 +82,7 @@ pub fn run() {
             commands::plot::update_plot,
             commands::plot::delete_plot,
             commands::plot::update_emotion,
+            commands::plot::get_emotions,
             // 伏笔/世界观相关
             commands::structure::get_structures,
             commands::structure::create_foreshadow,
@@ -88,6 +93,7 @@ pub fn run() {
             commands::structure::update_worldview,
             commands::structure::delete_worldview,
             commands::structure::mount_worldview,
+            commands::structure::unmount_worldview,
             // 线索相关
             commands::thread::get_threads,
             commands::thread::create_thread,
@@ -110,9 +116,6 @@ pub fn run() {
             commands::settings::update_settings,
             commands::settings::export_data,
             commands::settings::import_data,
-            // 导出相关
-            commands::chapter::export_chapter,
-            commands::chapter::export_book,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

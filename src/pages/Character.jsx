@@ -1,4 +1,4 @@
-// 人物页 - 双面卡片 + 关系图
+// fix: 人物页 - 双面卡片 + 关系图
 import { useEffect, useState } from 'react';
 import useBookStore from '../stores/useBookStore';
 import { characterApi } from '../api/character';
@@ -17,6 +17,7 @@ export default function Character() {
   useEffect(() => {
     if (currentBook) {
       loadCharacters();
+      loadRelationships();
     }
   }, [currentBook]);
 
@@ -26,6 +27,15 @@ export default function Character() {
       setCharacters(chars);
     } catch (e) {
       console.error('加载人物失败:', e);
+    }
+  };
+
+  const loadRelationships = async () => {
+    try {
+      const rels = await characterApi.getRelationships(currentBook.id);
+      setRelationships(rels);
+    } catch (e) {
+      console.error('加载关系失败:', e);
     }
   };
 

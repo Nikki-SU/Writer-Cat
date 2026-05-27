@@ -1,4 +1,4 @@
-// 导出所有模型
+// fix: 分离模型模块入口
 pub mod book;
 pub mod chapter;
 pub mod character;
