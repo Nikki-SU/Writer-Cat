@@ -5,16 +5,19 @@ import useEditorStore from '../stores/useEditorStore';
 import useStructureStore from '../stores/useStructureStore';
 import useAiStore from '../stores/useAiStore';
 import useSettingsStore from '../stores/useSettingsStore';
+import useSyncStore from '../stores/useSyncStore';
 import LeftSidebar from '../components/Sidebar/LeftSidebar';
 import EditorToolbar from '../components/Editor/EditorToolbar';
 import Editor from '../components/Editor/Editor';
 import AiPanel from '../components/Sidebar/AiPanel';
+import SyncPanel from '../components/Sidebar/SyncPanel';
 
 export default function Writer() {
   const { currentBook, chapters, currentChapter, selectChapter, createChapter, copyToClipboard, exportChapter, exportBook } = useBookStore();
   const { content, setContent, saveContent } = useEditorStore();
   const { foreshadows, worldviews, threads, loadStructures } = useStructureStore();
   const { aiPanelOpen, toggleAiPanel } = useAiStore();
+  const { syncPanelOpen, toggleSyncPanel } = useSyncStore();
   const { settings, updateSettings } = useSettingsStore();
   
   // 编辑器引用
@@ -136,6 +139,7 @@ export default function Writer() {
           onCopyPlain={handleCopyPlain}
           onCopyMd={handleCopyMd}
           onAiPanel={toggleAiPanel}
+          onSyncPanel={toggleSyncPanel}
           showCopyMenu={showCopyMenu}
           setShowCopyMenu={setShowCopyMenu}
           copyButtonRef={copyButtonRef}
@@ -156,6 +160,9 @@ export default function Writer() {
 
       {/* AI 面板 - 右侧 */}
       {aiPanelOpen && <AiPanel />}
+
+      {/* 同步面板 - 右侧 */}
+      {syncPanelOpen && <SyncPanel />}
 
       {/* 新建章节弹窗 - 贴近按钮位置 */}
       {showChapterCreate && (

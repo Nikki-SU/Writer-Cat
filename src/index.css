@@ -104,3 +104,43 @@ body {
   border: 2px dashed #4DBBD5;
   background-color: rgba(77, 187, 213, 0.1);
 }
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  /* 左侧栏在小屏幕上可折叠 */
+  .sidebar-mobile {
+    position: absolute;
+    z-index: 20;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
+  
+  /* 右侧面板在小屏幕上全屏 */
+  .right-panel-mobile {
+    position: absolute;
+    z-index: 20;
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* 工具栏在小屏幕上简化 */
+  .toolbar-mobile {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+  
+  /* 编辑器字体调整 */
+  .editor-mobile .cm-editor {
+    font-size: 14px;
+  }
+  
+  .editor-mobile .cm-content {
+    padding: 8px;
+  }
+}

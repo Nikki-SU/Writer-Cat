@@ -1,4 +1,4 @@
-// fix: 编辑器工具栏 - 文字功能栏（规格书要求）
+// 编辑器工具栏 - 文字功能栏
 // 字体大小调节 + 字体选择、文字颜色 + 行间距、日间/夜间切换 + 色温、语音输入、插入图片、一键复制
 import { useState, useRef, useEffect } from 'react';
 
@@ -12,6 +12,7 @@ function EditorToolbar({
   onCopyPlain,
   onCopyMd,
   onAiPanel,
+  onSyncPanel,
   showCopyMenu,
   setShowCopyMenu,
   copyButtonRef,
@@ -287,6 +288,15 @@ function EditorToolbar({
       </button>
 
       <div className="flex-1" />
+
+      {/* 同步按钮 */}
+      <button
+        onClick={onSyncPanel}
+        className="px-2 py-1 text-sm text-secondary hover:text-primary hover:bg-primary/10 rounded transition"
+        title="设备同步"
+      >
+        🔗 同步
+      </button>
 
       {/* AI 按钮 */}
       <button

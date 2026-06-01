@@ -3,12 +3,17 @@ mod commands;
 mod db;
 mod models;
 
+use std::sync::Arc;
 use tauri::Manager;
 
 /// 应用状态 - SqlitePool 本身是 Clone + Send + Sync，无需 Mutex
 pub struct AppState {
     pub db: sqlx::SqlitePool,
 }
+
+/// 同步管理器包装器
+#[derive(Clone)]
+pub struct SyncState(pub Arc<commands::sync::SyncManager>);
 
 pub fn run() {
     let db_path = dirs::data_dir()
@@ -40,9 +45,12 @@ pub fn run() {
             db::init_db(&pool).await.expect("数据库初始化失败");
         });
 
+    let sync_manager = Arc::new(commands::sync::SyncManager::new());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState { db: pool })
+        .manage(SyncState(sync_manager))
         .invoke_handler(tauri::generate_handler![
             // 书籍相关
             commands::book::create_book,
@@ -116,6 +124,12 @@ pub fn run() {
             commands::settings::update_settings,
             commands::settings::export_data,
             commands::settings::import_data,
+            // 同步相关
+            commands::sync::start_sync_server,
+            commands::sync::stop_sync_server,
+            commands::sync::get_sync_status,
+            commands::sync::discover_devices,
+            commands::sync::request_sync_from_device,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
