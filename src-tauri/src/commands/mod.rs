@@ -9,3 +9,4 @@ pub mod settings;
 pub mod structure;
 pub mod thread;
 pub mod sync;
+pub mod remote_sync;

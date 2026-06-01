@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档介绍如何将网文猫应用部署为 Android 和 Windows 应用程序，以及如何使用本地局域网同步功能。
+本文档介绍如何将网文猫应用部署为 Android 和 Windows 应用程序，以及如何使用本地局域网和远程同步功能。
 
 ## 项目结构
 
@@ -274,3 +274,173 @@ await syncApi.requestSyncFromDevice(device.id, book.id);
 - 阅读 `README.md` 了解更多功能
 - 查看 `src-tauri/` 目录下的 Rust 源代码
 - 参考 [Tauri 官方文档](https://tauri.app/)
+
+## 远程同步方案
+
+### 概述
+
+网文猫支持三种远程同步方式，让您可以在不同地点的设备之间同步数据，同时完全掌控自己的数据。
+
+### 方案对比
+
+| 方案 | 隐私性 | 难度 | 成本 | 推荐场景 |
+|------|--------|------|------|----------|
+| **Tailscale** | ⭐⭐⭐⭐⭐ | ⭐ 简单 | 免费* | 日常使用 |
+| 手动 IP | ⭐⭐⭐⭐⭐ | ⭐⭐ 简单 | 免费 | 临时使用 |
+| 自建 VPN | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ 复杂 | 服务器成本 | 企业用户 |
+
+*Tailscale 免费版支持 100 台设备
+
+### 方案一：Tailscale（推荐）
+
+#### 为什么选择 Tailscale？
+
+- ✅ **零配置** - 安装后自动建立加密隧道
+- ✅ **端到端加密** - 数据加密传输，不经过 Tailscale 服务器
+- ✅ **免费** - 个人用户免费使用
+- ✅ **跨平台** - 支持 Windows、macOS、Linux、Android、iOS
+- ✅ **私有化部署** - 可使用 Headscale 等开源项目完全自建控制服务器
+
+#### 设置步骤
+
+1. **在所有设备上安装 Tailscale**
+
+   Windows/macOS/Linux:
+   ```bash
+   # 安装 (Linux)
+   curl -fsSL https://tailscale.com/install.sh | sh
+   
+   # 启动并登录
+   tailscale up
+   ```
+
+   Android: 从 Google Play 或 F-Droid 安装 Tailscale 应用
+
+2. **登录 Tailscale 账号**
+
+   ```bash
+   # 使用 GitHub/Google 账号登录
+   tailscale login
+   ```
+
+3. **在网文猫中启用 Tailscale 模式**
+
+   - 打开应用
+   - 点击工具栏「🔗 同步」
+   - 选择「Tailscale 远程同步」
+   - 启动同步服务器
+   - 查看你的 Tailscale IP 地址
+
+4. **连接其他设备**
+
+   - 在另一台设备上也启动 Tailscale 并登录同一账号
+   - 获取对方的 Tailscale IP 地址
+   - 在「手动连接」中输入对方地址
+   - 开始同步
+
+#### Tailscale 工作原理
+
+```
+[设备A: 100.64.1.1] ←→ [Tailscale 加密隧道] ←→ [设备B: 100.64.1.2]
+       ↓                                                      ↓
+   本地网络                                              本地网络
+```
+
+- 设备之间通过 WireGuard 协议建立加密隧道
+- Tailscale 控制服务器只用于设备发现和密钥交换
+- **实际数据不经过任何第三方服务器**
+
+### 方案二：手动 IP 连接
+
+适合临时使用，无需安装额外软件。
+
+#### 设置步骤
+
+1. 确保两台设备可以互相访问（同一网络或通过端口转发）
+2. 在一台设备上启动同步服务器（选择「局域网同步」或「手动 IP 连接」）
+3. 记录显示的 IP 地址和端口
+4. 在另一台设备上选择「手动 IP 连接」
+5. 输入对方 IP 和端口
+6. 点击同步
+
+#### 注意事项
+
+- 需要知道对方的公网 IP 或局域网 IP
+- 如果在不同的网络，需要配置路由器端口转发
+- 建议配合动态 DNS 使用
+
+### 方案三：自建 VPN
+
+适合有技术能力且希望完全掌控的用户。
+
+#### 推荐方案：Headscale + WireGuard
+
+Headscale 是 Tailscale 控制服务器的开源实现，可以部署在自己的服务器上。
+
+#### 设置步骤
+
+1. **部署 Headscale 服务器**
+
+   ```bash
+   # 使用 Docker 部署
+   docker run -d \
+     --name headscale \
+     -v /etc/headscale:/etc/headscale \
+     -p 8080:8080 \
+     -p 3478:3478/udp \
+     headscale/headscale:latest
+   ```
+
+2. **配置 DNS**
+
+   将 `your-domain.com` 解析到你的服务器 IP
+
+3. **客户端配置**
+
+   ```bash
+   # 安装 CLI
+   curl -fsSL https://tailscale.com/install.sh | sh
+   
+   # 使用自建控制服务器
+   export TS_CONTROL_SERVER=https://your-domain.com
+   tailscale up
+   ```
+
+### 数据安全
+
+#### 传输安全
+
+- 所有同步数据使用 TCP 连接传输
+- 建议配合 VPN（WireGuard/Tailscale）使用
+- 未来版本将添加端到端加密
+
+#### 数据存储
+
+- 所有数据存储在本地设备
+- 云端不存储任何数据
+- 同步完成后可删除临时文件
+
+### 常见问题
+
+#### Q: Tailscale 免费版有什么限制？
+
+A: 免费版支持 100 台设备，使用 Tailscale 的公开控制服务器。对于大多数用户来说足够使用。
+
+#### Q: 如果没有公网 IP 怎么远程同步？
+
+A: 使用 Tailscale。它通过 UDP 打洞技术，即使没有公网 IP 也能建立连接。
+
+#### Q: 如何确保数据安全？
+
+A: 
+1. 使用 Tailscale（已内置 WireGuard 加密）
+2. 确保设备不被未授权访问
+3. 定期备份重要数据
+
+#### Q: 同步失败怎么办？
+
+A: 
+1. 检查网络连接
+2. 确认防火墙允许相应端口
+3. 查看应用日志获取详细错误信息
+4. 尝试重启同步服务器

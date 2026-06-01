@@ -15,6 +15,10 @@ pub struct AppState {
 #[derive(Clone)]
 pub struct SyncState(pub Arc<commands::sync::SyncManager>);
 
+/// 远程同步管理器包装器
+#[derive(Clone)]
+pub struct RemoteSyncState(pub Arc<commands::remote_sync::RemoteSyncManager>);
+
 pub fn run() {
     let db_path = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -46,11 +50,13 @@ pub fn run() {
         });
 
     let sync_manager = Arc::new(commands::sync::SyncManager::new());
+    let remote_sync_manager = Arc::new(commands::remote_sync::RemoteSyncManager::new());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState { db: pool })
         .manage(SyncState(sync_manager))
+        .manage(RemoteSyncState(remote_sync_manager))
         .invoke_handler(tauri::generate_handler![
             // 书籍相关
             commands::book::create_book,
@@ -130,6 +136,13 @@ pub fn run() {
             commands::sync::get_sync_status,
             commands::sync::discover_devices,
             commands::sync::request_sync_from_device,
+            // 远程同步相关
+            commands::remote_sync::start_remote_sync_server,
+            commands::remote_sync::stop_remote_sync_server,
+            commands::remote_sync::get_remote_sync_status,
+            commands::remote_sync::check_tailscale_status,
+            commands::remote_sync::connect_to_peer,
+            commands::remote_sync::register_peer,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
