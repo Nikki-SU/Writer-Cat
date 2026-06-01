@@ -69,7 +69,20 @@ const Editor = forwardRef(function Editor({
     },
     updateTheme: (theme) => {
       if (viewRef.current) {
-        // 主题更新逻辑
+        const isDark = theme === 'dark';
+        const extensions = isDark ? [oneDark] : [];
+        viewRef.current.dispatch({
+          effects: EditorView.reconfigure.of([
+            lineNumbers(),
+            highlightActiveLine(),
+            history(),
+            keymap.of([...defaultKeymap, ...historyKeymap]),
+            markdown(),
+            EditorView.lineWrapping,
+            decorationsField,
+            ...extensions,
+          ])
+        });
       }
     },
     setDecorations: (type, ranges) => {

@@ -1,4 +1,4 @@
-// fix: 写作页 - 左侧栏 + 编辑器（规格书要求）
+// 写作页 - 左侧栏 + 编辑器
 import { useEffect, useState, useRef, useCallback } from 'react';
 import useBookStore from '../stores/useBookStore';
 import useEditorStore from '../stores/useEditorStore';

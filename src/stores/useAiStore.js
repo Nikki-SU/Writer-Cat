@@ -1,41 +1,106 @@
-// fix: AI Store
+// AI Store
 import { create } from 'zustand';
 import { aiApi } from '../api/ai';
 
 const useAiStore = create((set, get) => ({
   isChecking: false,
   isExtracting: false,
-  checkResult: null,
-  extractResult: null,
+  checkResults: {},
+  extractResults: {},
+  checkErrors: {},
+  extractErrors: {},
   aiPanelOpen: false,
   aiToolExpanded: null,
 
-  // 检查文本
-  checkText: async (text, bookId) => {
-    set({ isChecking: true, checkResult: null });
+  // 检查文本（统一入口）
+  checkText: async (text, bookId, type = 'typo') => {
+    set((state) => ({
+      isChecking: true,
+      checkErrors: { ...state.checkErrors, [type]: null }
+    }));
     try {
       const result = await aiApi.checkText(text, bookId);
-      set({ isChecking: false, checkResult: result });
+      set((state) => ({
+        isChecking: false,
+        checkResults: { ...state.checkResults, [type]: result.typos || [] }
+      }));
       return result;
     } catch (e) {
-      set({ isChecking: false });
+      set((state) => ({
+        isChecking: false,
+        checkErrors: { ...state.checkErrors, [type]: e.toString() }
+      }));
       console.error('AI 检查失败:', e);
       throw e;
     }
   },
 
-  // 提取实体
+  // 检查世界观冲突
+  checkWorldviewConflict: async (text, bookId) => {
+    const result = await get().checkText(text, bookId, 'worldview_conflict');
+    set((state) => ({
+      checkResults: { ...state.checkResults, worldview_conflict: result.worldview_conflicts || [] }
+    }));
+    return result;
+  },
+
+  // 检查人设冲突
+  checkCharacterConflict: async (text, bookId) => {
+    const result = await get().checkText(text, bookId, 'character_conflict');
+    set((state) => ({
+      checkResults: { ...state.checkResults, character_conflict: result.character_conflicts || [] }
+    }));
+    return result;
+  },
+
+  // 提取实体（统一入口）
   extractEntities: async (text, bookId) => {
-    set({ isExtracting: true, extractResult: null });
+    set((state) => ({
+      isExtracting: true,
+      extractResults: {},
+      extractErrors: {}
+    }));
     try {
       const result = await aiApi.extractEntities(text, bookId);
-      set({ isExtracting: false, extractResult: result });
+      set({
+        isExtracting: false,
+        extractResults: {
+          characters: result.characters || [],
+          timeline: result.timeline || [],
+          foreshadow: result.foreshadows || [],
+          worldview: result.worldviews || []
+        }
+      });
       return result;
     } catch (e) {
       set({ isExtracting: false });
       console.error('AI 提取失败:', e);
       throw e;
     }
+  },
+
+  // 提取人物
+  extractCharacters: async (text, bookId) => {
+    const result = await get().extractEntities(text, bookId);
+    return result.characters;
+  },
+
+  // 提取大事记
+  extractTimeline: async (text, bookId) => {
+    const result = await get().extractEntities(text, bookId);
+    return result.timeline;
+  },
+
+  // 提取伏笔
+  extractForeshadows: async (text, bookId) => {
+    const result = await get().extractEntities(text, bookId);
+    return result.foreshadows;
+  },
+
+  // 提取世界观
+  extractWorldviews: async (text, bookId) => {
+    const result = await get().extractEntities(text, bookId);
+    return result.worldviews;
   },
 
   // 生成文本

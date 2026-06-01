@@ -1,9 +1,10 @@
-// fix: AI 面板 - 7个独立按钮（规格书要求）
+// AI 面板 - 7个独立按钮
 // AI检查3项: ❌错别字、🌍世界观冲突、👤人设冲突
 // AI提取4项: 👤提取人物、📋提取大事记、🎯提取伏笔、🌍提取世界观
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import useAiStore from '../../stores/useAiStore';
 import useBookStore from '../../stores/useBookStore';
+import useEditorStore from '../../stores/useEditorStore';
 
 export default function AiPanel() {
   const { toggleAiPanel } = useAiStore();
@@ -111,10 +112,12 @@ function AiExtractSection({ bookId, chapterId }) {
 
 // 单个检查按钮
 function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }) {
-  const { checkResults, isChecking, checkText, checkWorldviewConflict, checkCharacterConflict } = useAiStore();
+  const { checkResults, checkErrors, isChecking, checkText, checkWorldviewConflict, checkCharacterConflict } = useAiStore();
+  const { content } = useEditorStore();
   const [expanded, setExpanded] = useState(false);
   const result = checkResults?.[type];
-  const isLoading = isChecking?.[type];
+  const error = checkErrors?.[type];
+  const isLoading = isChecking;
 
   const handleClick = async () => {
     if (expanded) {
@@ -127,15 +130,18 @@ function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }
       return;
     }
 
+    if (!content || content.trim().length === 0) {
+      alert('当前章节内容为空');
+      return;
+    }
+
     try {
-      // TODO: 从编辑器获取实际文本内容
-      const text = '待检查的文本';
       if (type === 'typo') {
-        await checkText(text, bookId);
+        await checkText(content, bookId, 'typo');
       } else if (type === 'worldview_conflict') {
-        await checkWorldviewConflict(text, bookId);
+        await checkWorldviewConflict(content, bookId);
       } else if (type === 'character_conflict') {
-        await checkCharacterConflict(text, bookId);
+        await checkCharacterConflict(content, bookId);
       }
       setExpanded(true);
     } catch (e) {
@@ -145,6 +151,7 @@ function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }
 
   const getResultIcon = () => {
     if (isLoading) return '⏳';
+    if (error) return '❌';
     if (!result) return null;
     if (result.length === 0) return '✅';
     return '⚠️';
@@ -164,6 +171,13 @@ function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }
           {getResultIcon() && <span>{getResultIcon()}</span>}
         </div>
       </button>
+
+      {/* 错误信息 */}
+      {error && (
+        <div className="mt-2 p-3 bg-error/10 text-error rounded-lg text-xs">
+          {error}
+        </div>
+      )}
 
       {/* 结果展开面板 */}
       {expanded && result && (
@@ -200,10 +214,12 @@ function CheckButton({ label, type, bookId, chapterId, colorClass, borderClass }
 
 // 单个提取按钮
 function ExtractButton({ label, type, bookId, chapterId, colorClass, borderClass }) {
-  const { extractResults, isExtracting, extractCharacters, extractTimeline, extractForeshadows, extractWorldviews } = useAiStore();
+  const { extractResults, extractErrors, isExtracting, extractCharacters, extractTimeline, extractForeshadows, extractWorldviews } = useAiStore();
+  const { content } = useEditorStore();
   const [expanded, setExpanded] = useState(false);
   const result = extractResults?.[type];
-  const isLoading = isExtracting?.[type];
+  const error = extractErrors?.[type];
+  const isLoading = isExtracting;
 
   const handleClick = async () => {
     if (expanded) {
@@ -216,17 +232,20 @@ function ExtractButton({ label, type, bookId, chapterId, colorClass, borderClass
       return;
     }
 
+    if (!content || content.trim().length === 0) {
+      alert('当前章节内容为空');
+      return;
+    }
+
     try {
-      // TODO: 从编辑器获取实际文本内容
-      const text = '待提取的文本';
       if (type === 'character') {
-        await extractCharacters(text, bookId);
+        await extractCharacters(content, bookId);
       } else if (type === 'timeline') {
-        await extractTimeline(text, bookId);
+        await extractTimeline(content, bookId);
       } else if (type === 'foreshadow') {
-        await extractForeshadows(text, bookId);
+        await extractForeshadows(content, bookId);
       } else if (type === 'worldview') {
-        await extractWorldviews(text, bookId);
+        await extractWorldviews(content, bookId);
       }
       setExpanded(true);
     } catch (e) {
@@ -258,6 +277,13 @@ function ExtractButton({ label, type, bookId, chapterId, colorClass, borderClass
           )}
         </div>
       </button>
+
+      {/* 错误信息 */}
+      {error && (
+        <div className="mt-2 p-3 bg-error/10 text-error rounded-lg text-xs">
+          {error}
+        </div>
+      )}
 
       {/* 结果展开面板 */}
       {expanded && result && (

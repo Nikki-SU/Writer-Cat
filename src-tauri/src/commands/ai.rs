@@ -1,6 +1,8 @@
 // AI 检查和提取命令
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use crate::AppState;
+use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextCheckResult {
@@ -51,8 +53,37 @@ pub struct TimelineItem {
     pub chapter: Option<String>,
 }
 
+fn get_ollama_model(state: &State<'_, AppState>) -> String {
+    sqlx::query_as::<_, (String,)>("SELECT value FROM settings WHERE key = 'global'")
+        .fetch_optional(&state.db)
+        .ok()
+        .flatten()
+        .and_then(|(value,)| {
+            serde_json::from_str::<serde_json::Value>(&value).ok()
+        })
+        .and_then(|v| v.get("ollama_model"))
+        .and_then(|m| m.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| "qwen2.5:7b".to_string())
+}
+
+fn get_ollama_url(state: &State<'_, AppState>) -> String {
+    sqlx::query_as::<_, (String,)>("SELECT value FROM settings WHERE key = 'global'")
+        .fetch_optional(&state.db)
+        .ok()
+        .flatten()
+        .and_then(|(value,)| {
+            serde_json::from_str::<serde_json::Value>(&value).ok()
+        })
+        .and_then(|v| v.get("ollama_url"))
+        .and_then(|m| m.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| "http://localhost:11434".to_string())
+}
+
 #[tauri::command]
 pub async fn check_text(
+    state: State<'_, AppState>,
     text: String,
     _book_id: String,
 ) -> Result<TextCheckResult, String> {
@@ -62,6 +93,8 @@ pub async fn check_text(
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
 
+    let model = get_ollama_model(&state);
+    let ollama_url = get_ollama_url(&state);
     let client = reqwest::Client::new();
     let prompt = format!(
         r#"你是一个专业的网文写作助手。请检查以下文本中的问题：
@@ -82,9 +115,9 @@ pub async fn check_text(
         text
     );
 
-    let resp = client.post("http://localhost:11434/api/generate")
+    let resp = client.post(format!("{}/api/generate", ollama_url))
         .json(&json!({
-            "model": "qwen2.5:7b",
+            "model": model,
             "prompt": prompt,
             "stream": false,
             "options": { "temperature": 0.1 }
@@ -104,6 +137,7 @@ pub async fn check_text(
 
 #[tauri::command]
 pub async fn extract_entities(
+    state: State<'_, AppState>,
     text: String,
     _book_id: String,
 ) -> Result<ExtractResult, String> {
@@ -113,6 +147,8 @@ pub async fn extract_entities(
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
 
+    let model = get_ollama_model(&state);
+    let ollama_url = get_ollama_url(&state);
     let client = reqwest::Client::new();
     let prompt = format!(
         r#"你是一个专业的网文写作助手。请从以下文本中提取信息：
@@ -135,9 +171,9 @@ pub async fn extract_entities(
         text
     );
 
-    let resp = client.post("http://localhost:11434/api/generate")
+    let resp = client.post(format!("{}/api/generate", ollama_url))
         .json(&json!({
-            "model": "qwen2.5:7b",
+            "model": model,
             "prompt": prompt,
             "stream": false,
             "options": { "temperature": 0.3 }
@@ -157,6 +193,7 @@ pub async fn extract_entities(
 
 #[tauri::command]
 pub async fn generate_text(
+    state: State<'_, AppState>,
     prompt: String,
     context: Option<String>,
 ) -> Result<String, String> {
@@ -166,6 +203,8 @@ pub async fn generate_text(
         return Err("Ollama 未安装或未运行，请先安装 Ollama".to_string());
     }
 
+    let model = get_ollama_model(&state);
+    let ollama_url = get_ollama_url(&state);
     let client = reqwest::Client::new();
     let full_prompt = if let Some(ctx) = context {
         format!("上下文：{}\n\n请继续：{}", ctx, prompt)
@@ -173,9 +212,9 @@ pub async fn generate_text(
         prompt
     };
 
-    let resp = client.post("http://localhost:11434/api/generate")
+    let resp = client.post(format!("{}/api/generate", ollama_url))
         .json(&json!({
-            "model": "qwen2.5:7b",
+            "model": model,
             "prompt": full_prompt,
             "stream": false,
             "options": { "temperature": 0.7, "num_predict": 500 }

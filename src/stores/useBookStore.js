@@ -1,4 +1,4 @@
-// fix: 书籍 Store
+// 书籍 Store
 import { create } from 'zustand';
 import { bookApi } from '../api/book';
 import { chapterApi } from '../api/chapter';

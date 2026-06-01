@@ -1,4 +1,4 @@
-// fix: 书籍 API
+// 书籍 API
 import { invoke } from '@tauri-apps/api/core';
 
 export const bookApi = {
