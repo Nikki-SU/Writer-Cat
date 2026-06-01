@@ -28,6 +28,7 @@ export default function Settings() {
       <div className="flex gap-4 border-b mb-6">
         {[
           { key: 'general', label: '通用' },
+          { key: 'privacy', label: '🔐 隐私安全' },
           { key: 'ai', label: 'AI 设置' },
           { key: 'sync', label: '同步' },
           { key: 'color', label: '色卡' },
@@ -100,18 +101,95 @@ export default function Settings() {
         </div>
       )}
 
+      {/* 隐私安全设置 */}
+      {activeTab === 'privacy' && (
+        <div className="space-y-6">
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <h3 className="font-bold text-green-800 mb-2">✅ 你的数据是安全的！</h3>
+          <div className="text-sm text-green-700 space-y-2">
+            <p>• <strong>所有数据完全存储在本地，不上传任何数据到云端！</strong></p>
+            <p>• 使用时需要联网吗？不需要！可以完全离线使用。</p>
+          </div>
+        </div>
+
+        <div className="border rounded-lg p-4 space-y-4">
+          <h3 className="font-medium text-body">🔍 数据处理说明</h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">📂</span>
+              <div>
+                <h4 className="font-medium">数据存储</h4>
+                <p className="text-sm text-secondary">所有书籍、章节、人设等全部本地数据库和本地文件系统中</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🤖</span>
+              <div>
+                <h4 className="font-medium">AI 辅助功能</h4>
+                <p className="text-sm text-secondary">仅在本地运行 Ollama，文本不会发送到外部服务器</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🔄</span>
+              <div>
+                <h4 className="font-medium">同步功能</h4>
+                <p className="text-sm text-secondary">设备之间点对点传输，不经过任何第三方服务器</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border rounded-lg p-4 space-y-4">
+          <h3 className="font-medium text-body">⚠️ 使用建议</h3>
+          
+          <div className="space-y-2">
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h4 className="font-medium text-yellow-800 mb-1">关于 AI 辅助</h4>
+              <p className="text-sm text-yellow-700">
+                如果你担心数据绝对不希望你的文本被任何 AI 学习，建议：
+              </p>
+              <ul className="list-disc list-inside text-sm text-yellow-700 mt-1">
+                <li>在 AI 设置中选择"不使用 AI"</li>
+                <li>或者确保不安装或启动 Ollama</li>
+              </ul>
+            </div>
+            
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-1">同步安全提示</h4>
+              <p className="text-sm text-blue-700">
+                使用 Tailscale 远程同步时：
+              </p>
+              <ul className="list-disc list-inside text-sm text-blue-700 mt-1">
+                <li>Tailscale 仅用于建立加密隧道，数据不经过他们的服务器</li>
+                <li>可以完全在同一局域网或自托管的设备可以只在局域网内同步</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI 设置 */}
       {activeTab === 'ai' && (
         <div className="space-y-4">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+            <h4 className="font-medium text-yellow-800 mb-1">⚠️ 隐私提示</h4>
+            <p className="text-sm text-yellow-700">
+              <strong>选择"不使用 AI"</strong>可以完全确保你的文本不会被任何 AI 处理。
+            </p>
+          </div>
+          
           <SettingItem label="AI 提供商">
             <select
               value={settings.ai_provider}
               onChange={(e) => handleChange('ai_provider', e.target.value)}
               className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
             >
-              <option value="ollama">Ollama (本地)</option>
-              <option value="online">在线 API</option>
-              <option value="none">不使用 AI</option>
+              <option value="ollama">Ollama (本地 - 仅本机处理)</option>
+              <option value="online">在线 API (文本将发送到外部服务器)</option>
+              <option value="none">不使用 AI (最安全)</option>
             </select>
           </SettingItem>
 
